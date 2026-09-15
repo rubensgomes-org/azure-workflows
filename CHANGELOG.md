@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.3] - 2026-09-15
+
+### Added
+
+### Changed
+
 - `acr-repo-delete` now succeeds when the registry does not exist, matching
   its existing behavior for a repository that does not exist. A failure to
   query Azure still fails the run.
