@@ -26,6 +26,10 @@ the GitHub Release notes.
 
 ### Changed
 
+- **Breaking:** `gradle-args`, `properties-file`, and `release-branch` are no
+  longer inputs on `gradle-release`; each is fixed at its former default
+  value.
+
 ### Fixed
 
 ## [0.0.6] - 2026-09-15

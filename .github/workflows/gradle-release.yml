@@ -21,18 +21,6 @@ name: gradle-release
 on:
   workflow_call:
     inputs:
-      release-branch:
-        description: >-
-          Branch to release from. Must match the release plugin requireBranch
-          setting.
-        required: false
-        default: main
-        type: string
-      properties-file:
-        description: 'Properties file holding developerName and developerEmail.'
-        required: false
-        default: gradle.properties
-        type: string
       java-version:
         description: >-
           Java language version. Must match the consumer build toolchain pin.
@@ -44,16 +32,6 @@ on:
           JDK distribution. Must match the consumer build toolchain vendor pin.
         required: false
         default: microsoft
-        type: string
-      gradle-args:
-        description: >-
-          Flags passed to every ./gradlew invocation. Word-split by bash, so
-          unquoted.
-        required: false
-        default: >-
-          --console=plain
-          -Dorg.gradle.logging.level=lifecycle
-          -Porg.gradle.java.installations.auto-download=false
         type: string
       timeout-minutes:
         description: 'Job timeout in minutes.'
@@ -79,8 +57,12 @@ jobs:
     env:
       PACKAGES_USER: ${{ github.actor }}
       PACKAGES_TOKEN: ${{ secrets.packages-token }}
-      GRADLE_ARGS: ${{ inputs.gradle-args }}
-      PROPERTIES_FILE: ${{ inputs.properties-file }}
+      # Not an input: match the gradle-build action's own defaults.
+      GRADLE_ARGS: >-
+        --console=plain
+        -Dorg.gradle.logging.level=lifecycle
+        -Porg.gradle.java.installations.auto-download=false
+      PROPERTIES_FILE: gradle.properties
 
     steps:
       # Checks out the CALLING repository. "ref" is explicit because a release
@@ -89,7 +71,7 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.release-branch }}
+          ref: main
           fetch-depth: 0
           token: ${{ secrets.packages-token }}
 
