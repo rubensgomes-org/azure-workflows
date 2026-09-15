@@ -23,7 +23,7 @@ the GitHub Release notes.
 ## [Unreleased]
 
 ### Added
-
+- Initial release.
 ### Changed
 
 ### Fixed
