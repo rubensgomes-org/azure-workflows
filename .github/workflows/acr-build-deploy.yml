@@ -24,7 +24,7 @@ on:
         description: >-
           Image namespace, used as <environment>/<artifactId>:<tag>.
         required: false
-        default: lab
+        default: dev
         type: string
       tag:
         description: >-
