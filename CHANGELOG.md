@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.6] - 2026-09-15
+
+### Added
+
+### Changed
+
 - **Breaking:** `environment` and `registry-name` are now required inputs
   (no default) on `acr-build-deploy` and `acr-repo-delete`.
 - **Breaking:** `runs-on` is no longer an input; every reusable workflow now
