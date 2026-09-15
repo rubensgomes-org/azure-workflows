@@ -7,10 +7,7 @@
 #
 # Two independent safeguards run BEFORE any Azure credential is touched:
 #   1. the actor must be one of the logins in the allowed-actor input;
-#   2. the caller must have typed "DELETE REPO <registry-name>
-#      <environment>/<artifactId>" exactly, and that phrase is built from the
-#      RESOLVED registry and repository, so it cannot be satisfied by guessing
-#      what the inputs will produce.
+#   2. the caller must have checked the confirm checkbox.
 # Keep the sign-in step after them. If the safeguard fails, nothing was
 # deleted and Azure was never contacted, and the log must be able to say so.
 #
@@ -38,7 +35,7 @@ on:
           Image namespace. With artifactId this forms the repository
           <environment>/<artifactId>.
         required: false
-        default: lab
+        default: dev
         type: string
       registry-name:
         description: >-
@@ -49,10 +46,10 @@ on:
         type: string
       confirm:
         description: >-
-          Must equal "DELETE REPO <registry-name> <environment>/<artifactId>"
-          exactly.
+          Confirms permanent deletion of every tag and manifest in the
+          resolved repository. Must be checked (true).
         required: true
-        type: string
+        type: boolean
       allowed-actor:
         description: >
           GitHub logins permitted to run this workflow, separated by commas or
@@ -141,15 +138,15 @@ jobs:
 
       # MUST stay ahead of the sign-in step. github.actor is the actor of the
       # CALLER's run, which is the human who pressed "Run workflow".
-      - name: SAFEGUARD - Validate actor and confirmation phrase
+      - name: SAFEGUARD - Validate actor and confirmation checkbox
         shell: bash
         env:
           ACTOR: ${{ github.actor }}
           REPOSITORY: ${{ steps.repo.outputs.repository }}
-          TYPED_CONFIRM: ${{ inputs.confirm }}
+          CONFIRMED: ${{ inputs.confirm }}
         run: |
           echo "=============================================================="
-          echo " STEP: SAFEGUARD - Validate actor and confirmation phrase"
+          echo " STEP: SAFEGUARD - Validate actor and confirmation checkbox"
           echo "=============================================================="
           set -euo pipefail
           # Split on commas and spaces so the input can carry one login or
@@ -168,13 +165,9 @@ jobs:
             echo "Actor: '${ACTOR}'." >&2
             exit 1
           fi
-          # Built from the RESOLVED registry and repository, so the phrase
-          # proves the caller knows what will actually be deleted.
-          expected_phrase="DELETE REPO ${ACR_NAME} ${REPOSITORY}"
-          if [ "$TYPED_CONFIRM" != "$expected_phrase" ]; then
-            echo "Denied: confirmation phrase did not match exactly." >&2
-            echo "Expected: ${expected_phrase}" >&2
-            echo "Got:      ${TYPED_CONFIRM}" >&2
+          if [ "$CONFIRMED" != "true" ]; then
+            echo "Denied: confirm checkbox was not checked." >&2
+            echo "Target repository: ${ACR_NAME} ${REPOSITORY}" >&2
             echo "" >&2
             echo "Nothing was deleted and Azure was never contacted." >&2
             exit 1

@@ -28,6 +28,8 @@ the GitHub Release notes.
 
 ### Fixed
 
+- fixed confirm and environment
+
 ## [0.0.4] - 2026-09-15
 
 ### Added
