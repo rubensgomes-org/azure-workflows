@@ -1,0 +1,161 @@
+# =============================================================================
+# gradle-build-verify
+#
+# Reusable workflow: compile, test, check, assemble. The SonarCloud quality
+# gate is OPT-IN -- pass run-sonar: true to enable it. It does NOT publish
+# anything and does not write to the repository. Releasing is
+# gradle-release.yml.
+#
+# Reused by Rubens Gomes Spring Boot repository projects. Callers keep a thin
+# workflow_dispatch stub that owns the "Run workflow" button, the permissions
+# and the concurrency group; see README.md for a copy-paste stub.
+#
+# For this workflow to be re-used by other repositories in the same GitHub
+# organization, Settings -- Actions (General) -- Access must be set to
+# "Accessible from repositories in the 'rubensgomes-org' organization".
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: gradle-build-verify
+
+on:
+  workflow_call:
+    inputs:
+      project-path:
+        description: >-
+          Gradle project path to build, without a trailing colon (e.g. ":app").
+        required: false
+        default: ':app'
+        type: string
+      java-version:
+        description: >-
+          Java language version. Must match the consumer build toolchain pin.
+        required: false
+        default: '25'
+        type: string
+      java-distribution:
+        description: >-
+          JDK distribution. Must match the consumer build toolchain vendor pin.
+        required: false
+        default: microsoft
+        type: string
+      gradle-args:
+        description: >-
+          Flags passed to every ./gradlew invocation. Word-split by bash, so
+          unquoted.
+        required: false
+        default: >-
+          --console=plain
+          -Dorg.gradle.logging.level=lifecycle
+          -Porg.gradle.java.installations.auto-download=false
+        type: string
+      run-sonar:
+        description: >-
+          Run the SonarCloud analysis and block on its quality gate. Opt-in.
+        required: false
+        default: false
+        type: boolean
+      runs-on:
+        description: 'Runner label for the job.'
+        required: false
+        default: ubuntu-latest
+        type: string
+      timeout-minutes:
+        description: 'Job timeout in minutes.'
+        required: false
+        default: 30
+        type: number
+
+    secrets:
+      # IMPORTANT NOTE:
+      #
+      # The consumer repository should have a PAT (Personal Access Token) with
+      # the `read:packages` permission, created under the repository owner's
+      # account.
+      #
+      # The consumer repository's workflow should then store this PAT as a new
+      # Actions repository secret.
+      #
+      # The name of the Actions repository secret should match the secret name
+      # referenced in the consumer workflow code.
+      #
+      # A classic PAT with read:packages. settings.gradle.kts resolves the
+      # shared version catalog from GitHub Packages while EVALUATING SETTINGS,
+      # so every ./gradlew call needs it; without it, an HTTP 401.
+      #
+      # The per-run GITHUB_TOKEN cannot be used: it is scoped to the calling
+      # repository, and the catalog lives in a different one (mvn-pkgs).
+      packages-token:
+        description: >-
+          GitHub Packages token, exported to the build as GITHUB_TOKEN.
+        required: true
+      # Must be able to READ QUALITY GATE STATUS, not just submit analyses --
+      # gradle.properties sets sonar.qualitygate.wait=true.
+      sonar-token:
+        description: 'SonarCloud token. Required when run-sonar is true.'
+        required: false
+
+jobs:
+  build-verify:
+    name: build-verify
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+
+    env:
+      # github.actor is the actor of the CALLER's run, which is what we want.
+      PACKAGES_USER: ${{ github.actor }}
+      PACKAGES_TOKEN: ${{ secrets.packages-token }}
+      SONAR_TOKEN: ${{ secrets.sonar-token }}
+      GRADLE_ARGS: ${{ inputs.gradle-args }}
+      PROJECT_PATH: ${{ inputs.project-path }}
+
+    steps:
+      # Checks out the CALLING repository, not azure-workflows. That is why the
+      # composite actions below are referenced by full path rather than "./".
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          # Full history: SonarCloud needs blame data to attribute New Code.
+          fetch-depth: 0
+
+      - name: Set up Java and Gradle
+        uses: rubensgomes-org/azure-workflows/.github/actions/setup-java-gradle@v0
+        with:
+          java-version: ${{ inputs.java-version }}
+          java-distribution: ${{ inputs.java-distribution }}
+
+      - name: Build
+        uses: rubensgomes-org/azure-workflows/.github/actions/gradle-build@v0
+        with:
+          packages-user: ${{ env.PACKAGES_USER }}
+          packages-token: ${{ env.PACKAGES_TOKEN }}
+          gradle-args: ${{ env.GRADLE_ARGS }}
+          project-path: ${{ env.PROJECT_PATH }}
+
+      # Skipped unless the caller opts in with run-sonar: true. A skipped step
+      # here is the expected outcome, not a misconfiguration.
+      - name: sonar
+        if: ${{ inputs.run-sonar }}
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: sonar"
+          echo " ./gradlew ${PROJECT_PATH}:sonar"
+          echo "=============================================================="
+          set -euo pipefail
+          if [ -z "${SONAR_TOKEN:-}" ]; then
+            echo "run-sonar was set to true but no sonar-token secret was" >&2
+            echo "supplied. Map it in the caller's 'secrets:' block, or drop" \
+              >&2
+            echo "run-sonar from the caller to fall back to the default." >&2
+            exit 1
+          fi
+          export GITHUB_USER="$PACKAGES_USER"
+          export GITHUB_TOKEN="$PACKAGES_TOKEN"
+          # $GRADLE_ARGS is intentionally unquoted: bash word-splitting is how
+          # the flags become separate arguments.
+          # shellcheck disable=SC2086
+          ./gradlew $GRADLE_ARGS "${PROJECT_PATH}:sonar"

@@ -1,0 +1,330 @@
+# =============================================================================
+# acr-build-deploy
+#
+# Reusable workflow: build the application, then build and push its container
+# image to an EXISTING Azure Container Registry with "az acr build", verify
+# the push landed, smoke-test the image, and purge the untagged manifests it
+# orphaned. "az acr build" builds server-side in ACR Tasks: no local Docker,
+# no docker login, no separate push.
+#
+# This workflow never CREATES a registry. Provisioning lives in
+# rubensgomes-org/azure-iac.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: acr-build-deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: >-
+          Image namespace, used as <environment>/<artifactId>:<tag>.
+        required: false
+        default: lab
+        type: string
+      tag:
+        description: >-
+          Image tag. Empty defaults to the application version.
+        required: false
+        default: ''
+        type: string
+      registry-name:
+        description: >-
+          Name of the EXISTING Azure Container Registry to push to (not the
+          login server).
+        required: false
+        default: crrgomeslab01
+        type: string
+      project-path:
+        description: >-
+          Gradle project path to build, without a trailing colon (e.g. ":app").
+        required: false
+        default: ':app'
+        type: string
+      dotenv-path:
+        description: >-
+          Local temporary file the Gradle build writes environment
+          information to, such as APP_VERSION.
+        required: false
+        default: .env
+        type: string
+      artifact-properties-path:
+        description: >-
+          Properties file holding artifactId, which names the image repository.
+        required: false
+        default: app/gradle.properties
+        type: string
+      docker-context:
+        description: 'Build context uploaded to ACR Tasks.'
+        required: false
+        default: '.'
+        type: string
+      smoke-test-entrypoint:
+        description: >
+          ENTRYPOINT override for the smoke test. The default image ENTRYPOINT
+          is "java -XX:AOTCache=app.aot -jar application.jar", so it must be
+          overridden to run anything else. Set empty to use the image
+          ENTRYPOINT.
+        required: false
+        default: java
+        type: string
+      smoke-test-args:
+        description: 'Arguments passed to the smoke-tested image.'
+        required: false
+        default: '--version'
+        type: string
+      java-version:
+        description: >-
+          Java language version. Must match the consumer build toolchain pin.
+        required: false
+        default: '25'
+        type: string
+      java-distribution:
+        description: >-
+          JDK distribution. Must match the consumer build toolchain vendor pin.
+        required: false
+        default: microsoft
+        type: string
+      gradle-args:
+        description: >-
+          Flags passed to every ./gradlew invocation. Word-split by bash, so
+          unquoted.
+        required: false
+        default: >-
+          --console=plain
+          -Dorg.gradle.logging.level=lifecycle
+          -Porg.gradle.java.installations.auto-download=false
+        type: string
+      runs-on:
+        description: 'Runner label for the job.'
+        required: false
+        default: ubuntu-latest
+        type: string
+      timeout-minutes:
+        description: 'Job timeout in minutes.'
+        required: false
+        default: 45
+        type: number
+      # Identifiers, not credentials: they name the principal, tenant and
+      # subscription but grant nothing without the client secret, which stays a
+      # secret. Declaring them as inputs lets callers map organization Actions
+      # VARIABLES into them, so the values stay readable in logs and settings
+      # instead of being masked as "***" during a failed sign-in.
+      azure-client-id:
+        description: 'Service principal application (client) ID.'
+        required: true
+        type: string
+      azure-tenant-id:
+        description: 'Entra ID tenant ID.'
+        required: true
+        type: string
+      azure-subscription-id:
+        description: 'Subscription holding the registry.'
+        required: true
+        type: string
+
+    secrets:
+      packages-token:
+        description: >-
+          GitHub Packages token, exported to the build as GITHUB_TOKEN.
+        required: true
+      azure-client-secret:
+        description: 'Service principal client secret.'
+        required: true
+
+jobs:
+  build:
+    name: build
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+
+    env:
+      PACKAGES_USER: ${{ github.actor }}
+      PACKAGES_TOKEN: ${{ secrets.packages-token }}
+      ACR_NAME: ${{ inputs.registry-name }}
+      GRADLE_ARGS: ${{ inputs.gradle-args }}
+      PROJECT_PATH: ${{ inputs.project-path }}
+
+    steps:
+      # Checks out the CALLING repository, not azure-workflows.
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Sign in to Azure
+        uses: rubensgomes-org/azure-workflows/.github/actions/azure-login@v0
+        with:
+          client-id: ${{ inputs.azure-client-id }}
+          client-secret: ${{ secrets.azure-client-secret }}
+          tenant-id: ${{ inputs.azure-tenant-id }}
+          subscription-id: ${{ inputs.azure-subscription-id }}
+
+      # Fail fast on a missing registry, BEFORE spending several minutes on a
+      # Gradle build whose output could not be pushed anywhere.
+      - name: Verify the registry exists
+        id: registry
+        uses: rubensgomes-org/azure-workflows/.github/actions/verify-acr-registry@v0
+        with:
+          registry-name: ${{ inputs.registry-name }}
+
+      - name: Set up Java and Gradle
+        uses: rubensgomes-org/azure-workflows/.github/actions/setup-java-gradle@v0
+        with:
+          java-version: ${{ inputs.java-version }}
+          java-distribution: ${{ inputs.java-distribution }}
+
+      - name: Build
+        uses: rubensgomes-org/azure-workflows/.github/actions/gradle-build@v0
+        with:
+          packages-user: ${{ env.PACKAGES_USER }}
+          packages-token: ${{ env.PACKAGES_TOKEN }}
+          gradle-args: ${{ env.GRADLE_ARGS }}
+          project-path: ${{ env.PROJECT_PATH }}
+
+      # Must run AFTER the build: APP_VERSION is written by generateDotEnv,
+      # which hangs off "tasks.build".
+      - name: Resolve the image coordinates
+        id: image
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          DOTENV_PATH: ${{ inputs.dotenv-path }}
+          ARTIFACT_PROPERTIES_PATH: ${{ inputs.artifact-properties-path }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Resolve the image coordinates"
+          echo "=============================================================="
+          set -euo pipefail
+          app_version="$(sed -n 's/^APP_VERSION=//p' "$DOTENV_PATH" \
+                           2>/dev/null || true)"
+          if [ -z "$app_version" ]; then
+            echo "APP_VERSION not found in ${DOTENV_PATH}." >&2
+            echo "It is written by the Gradle build, so this means the" >&2
+            echo "build step did not run or did not reach generateDotEnv." >&2
+            exit 1
+          fi
+          artifact_id="$(sed -n 's/^artifactId=//p' \
+                           "$ARTIFACT_PROPERTIES_PATH")"
+          if [ -z "$artifact_id" ]; then
+            echo "artifactId not found in ${ARTIFACT_PROPERTIES_PATH}" >&2
+            exit 1
+          fi
+          if [ -z "${ENVIRONMENT:-}" ]; then
+            echo "The environment input resolved to empty." >&2
+            exit 1
+          fi
+          # An empty tag input means "use the application version".
+          tag="${INPUT_TAG:-$app_version}"
+          echo "image=${ENVIRONMENT}/${artifact_id}:${tag}" >> "$GITHUB_OUTPUT"
+          echo "app_version=${app_version}"                >> "$GITHUB_OUTPUT"
+          echo "Building ${ENVIRONMENT}/${artifact_id}:${tag}" \
+               "(version ${app_version})"
+
+      - name: Build and push the image with az acr build
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          APP_VERSION: ${{ steps.image.outputs.app_version }}
+          DOCKER_CONTEXT: ${{ inputs.docker-context }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Build and push the image with az acr build"
+          echo " az acr build --registry ${ACR_NAME} --image ${IMAGE}"
+          echo "=============================================================="
+          set -euo pipefail
+          az acr build \
+            --registry "$ACR_NAME" \
+            --image "$IMAGE" \
+            --build-arg APP_VERSION="$APP_VERSION" \
+            "$DOCKER_CONTEXT"
+
+      - name: Verify the image exists in the registry
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Verify the image exists in the registry"
+          echo " az acr repository show --name ${ACR_NAME} --image ${IMAGE}"
+          echo "=============================================================="
+          set -euo pipefail
+          if ! digest="$(az acr repository show --name "$ACR_NAME" \
+                           --image "$IMAGE" --query digest -o tsv)"; then
+            echo "Image '${IMAGE}' is not in registry '${ACR_NAME}'." >&2
+            echo "The build step reported success, so the push did not land." \
+              >&2
+            echo "" >&2
+            echo "Tags currently in ${IMAGE%%:*}:" >&2
+            az acr repository show-tags --name "$ACR_NAME" \
+              --repository "${IMAGE%%:*}" -o tsv >&2 \
+              || echo "  (repository does not exist)" >&2
+            exit 1
+          fi
+          echo "Present in ${ACR_NAME}. Digest: ${digest}"
+
+      # Runs the pushed image inside ACR, proving the layers are pullable and
+      # the JVM starts. "$Registry" is substituted by ACR Tasks, not by bash.
+      - name: Smoke-test the image with az acr run
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          SMOKE_ENTRYPOINT: ${{ inputs.smoke-test-entrypoint }}
+          SMOKE_ARGS: ${{ inputs.smoke-test-args }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Smoke-test the image with az acr run"
+          echo "=============================================================="
+          set -euo pipefail
+          # Without the override the image ENTRYPOINT is
+          # "java -XX:AOTCache=app.aot -jar application.jar", which would boot
+          # the whole application instead of answering "--version".
+          if [ -n "${SMOKE_ENTRYPOINT:-}" ]; then
+            smoke_cmd="--entrypoint ${SMOKE_ENTRYPOINT}"
+            smoke_cmd="${smoke_cmd} \$Registry/${IMAGE} ${SMOKE_ARGS}"
+          else
+            smoke_cmd="\$Registry/${IMAGE} ${SMOKE_ARGS}"
+          fi
+          echo " az acr run --registry ${ACR_NAME} --cmd \"${smoke_cmd}\""
+          az acr run \
+            --registry "$ACR_NAME" \
+            --cmd "$smoke_cmd" \
+            /dev/null
+
+      # Re-pushing a tag orphans the manifest it previously pointed at. Those
+      # untagged manifests still bill against the registry quota.
+      - name: Purge untagged images from the repository
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Purge untagged images from the repository"
+          echo "=============================================================="
+          set -euo pipefail
+          repository="${IMAGE%%:*}"
+          # The TAG half of the filter is "^$" -- match the EMPTY tag, i.e.
+          # untagged manifests only. It is NOT a typo for "^.*$": a filter that
+          # matched every tag would delete the image just pushed.
+          purge_cmd="acr purge --filter '^${repository}$:^\$'"
+          purge_cmd="${purge_cmd} --ago 0d --untagged"
+          echo " az acr run --registry ${ACR_NAME} --cmd \"${purge_cmd}\""
+          az acr run \
+            --registry "$ACR_NAME" \
+            --cmd "$purge_cmd" \
+            /dev/null
+
+      - name: Report the published image
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          ACR_LOGIN_SERVER: ${{ steps.registry.outputs.login-server }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Report the published image"
+          echo "=============================================================="
+          echo "Published:"
+          echo "  ${ACR_LOGIN_SERVER}/${IMAGE}"

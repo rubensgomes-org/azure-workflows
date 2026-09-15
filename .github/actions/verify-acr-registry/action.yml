@@ -1,0 +1,69 @@
+# =============================================================================
+# verify-acr-registry
+#
+# Asserts that an Azure Container Registry exists and is visible to the
+# signed-in principal, and returns its login server.
+#
+# This action never CREATES a registry. Provisioning is Terraform's job and
+# lives in rubensgomes-org/azure-iac -- see acr-create.yml there.
+#
+# Callers MUST run the azure-login action first.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: verify-acr-registry
+description: >-
+  Asserts an Azure Container Registry exists and returns its login server.
+
+inputs:
+  registry-name:
+    description: >-
+      Name of the EXISTING Azure Container Registry (not the login server).
+    required: true
+
+outputs:
+  login-server:
+    description: >-
+      Fully qualified login server of the registry, e.g. myacr.azurecr.io.
+    value: ${{ steps.verify.outputs.login_server }}
+
+runs:
+  using: composite
+  steps:
+    - name: Verify the registry exists
+      id: verify
+      shell: bash
+      env:
+        ACR_NAME: ${{ inputs.registry-name }}
+      run: |
+        echo "=============================================================="
+        echo " STEP: Verify the registry exists"
+        echo " az acr show --name ${ACR_NAME}"
+        echo "=============================================================="
+        set -euo pipefail
+        if ! login_server="$(az acr show --name "$ACR_NAME" \
+                               --query loginServer -o tsv)"; then
+          echo "No Azure Container Registry named '${ACR_NAME}' is" >&2
+          echo "visible to this service principal in the signed-in" >&2
+          echo "subscription." >&2
+          echo "" >&2
+          echo "This workflow does not create registries. Pass an existing" >&2
+          echo "name via the registry-name input, or provision it from the" >&2
+          echo "rgomes-azure-iac repository first." >&2
+          echo "" >&2
+          echo "Registries this principal CAN see:" >&2
+          az acr list --query '[].name' -o tsv >&2 || echo "  (none)" >&2
+          exit 1
+        fi
+        # A successful call that yields nothing would otherwise propagate an
+        # empty login server into the image reference and fail much later,
+        # somewhere far less obvious.
+        if [ -z "$login_server" ]; then
+          echo "Registry '${ACR_NAME}' returned an empty loginServer." >&2
+          exit 1
+        fi
+        echo "login_server=${login_server}" >> "$GITHUB_OUTPUT"
+        echo "Registry ${ACR_NAME} exists; login server is ${login_server}"

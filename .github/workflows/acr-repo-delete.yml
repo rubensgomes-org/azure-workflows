@@ -1,0 +1,287 @@
+# =============================================================================
+# acr-repo-delete
+#
+# Reusable workflow: DESTRUCTIVE. Deletes an entire repository -- every tag
+# and every manifest -- from an Azure Container Registry. There is no
+# soft-delete and no recycle bin.
+#
+# Two independent safeguards run BEFORE any Azure credential is touched:
+#   1. the actor must be one of the logins in the allowed-actor input;
+#   2. the caller must have typed "DELETE REPO <environment>/<artifactId>"
+#      exactly, and that phrase is built from the RESOLVED repository, so it
+#      cannot be satisfied by guessing what the inputs will produce.
+# Keep the sign-in step after them. If the safeguard fails, nothing was
+# deleted and Azure was never contacted, and the log must be able to say so.
+#
+# NOTE: acr-destroy.yml in rubensgomes-org/azure-iac destroys the
+# registry itself. This one only empties a repository inside a registry that
+# stays.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: acr-repo-delete
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: >-
+          Image namespace. With artifactId this forms the repository
+          <environment>/<artifactId>.
+        required: false
+        default: lab
+        type: string
+      registry-name:
+        description: >-
+          Name of the EXISTING Azure Container Registry to delete from (not the
+          login server).
+        required: false
+        default: crrgomeslab01
+        type: string
+      confirm:
+        description: >-
+          Must equal "DELETE REPO <environment>/<artifactId>" exactly.
+        required: true
+        type: string
+      allowed-actor:
+        description: >
+          GitHub logins permitted to run this workflow, separated by commas or
+          spaces. Still singular so that callers already passing one login keep
+          working.
+        required: false
+        default: 'rubensgomes,rubens-gomes_3CC'
+        type: string
+      artifact-properties-path:
+        description: >-
+          Properties file holding artifactId, which names the image repository.
+        required: false
+        default: app/gradle.properties
+        type: string
+      runs-on:
+        description: 'Runner label for the job.'
+        required: false
+        default: ubuntu-latest
+        type: string
+      timeout-minutes:
+        description: 'Job timeout in minutes.'
+        required: false
+        default: 15
+        type: number
+      # Identifiers, not credentials: they name the principal, tenant and
+      # subscription but grant nothing without the client secret, which stays a
+      # secret. Declaring them as inputs lets callers map organization Actions
+      # VARIABLES into them, so the values stay readable in logs and settings
+      # instead of being masked as "***" during a failed sign-in.
+      azure-client-id:
+        description: 'Service principal application (client) ID.'
+        required: true
+        type: string
+      azure-tenant-id:
+        description: 'Entra ID tenant ID.'
+        required: true
+        type: string
+      azure-subscription-id:
+        description: 'Subscription holding the registry.'
+        required: true
+        type: string
+
+    secrets:
+      azure-client-secret:
+        description: 'Service principal client secret.'
+        required: true
+
+jobs:
+  delete:
+    name: delete
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+
+    env:
+      ACR_NAME: ${{ inputs.registry-name }}
+      ENVIRONMENT: ${{ inputs.environment }}
+      ALLOWED_ACTOR: ${{ inputs.allowed-actor }}
+
+    steps:
+      # Only to read the consumer's properties file. No build runs here.
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Resolve the repository coordinates
+        id: repo
+        shell: bash
+        env:
+          ARTIFACT_PROPERTIES_PATH: ${{ inputs.artifact-properties-path }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Resolve the repository coordinates"
+          echo "=============================================================="
+          set -euo pipefail
+          artifact_id="$(sed -n 's/^artifactId=//p' \
+                           "$ARTIFACT_PROPERTIES_PATH")"
+          if [ -z "$artifact_id" ]; then
+            echo "artifactId not found in ${ARTIFACT_PROPERTIES_PATH}" >&2
+            exit 1
+          fi
+          if [ -z "${ENVIRONMENT:-}" ]; then
+            echo "The environment input resolved to empty." >&2
+            exit 1
+          fi
+          echo "repository=${ENVIRONMENT}/${artifact_id}" >> "$GITHUB_OUTPUT"
+          echo "Target repository: ${ENVIRONMENT}/${artifact_id}"
+
+      # MUST stay ahead of the sign-in step. github.actor is the actor of the
+      # CALLER's run, which is the human who pressed "Run workflow".
+      - name: SAFEGUARD - Validate actor and confirmation phrase
+        shell: bash
+        env:
+          ACTOR: ${{ github.actor }}
+          REPOSITORY: ${{ steps.repo.outputs.repository }}
+          TYPED_CONFIRM: ${{ inputs.confirm }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: SAFEGUARD - Validate actor and confirmation phrase"
+          echo "=============================================================="
+          set -euo pipefail
+          # Split on commas and spaces so the input can carry one login or
+          # several. Matching stays exact per login: a substring match would
+          # let "rubensgomes-bot" pass as "rubensgomes".
+          IFS=', ' read -r -a allowed_actors <<< "$ALLOWED_ACTOR"
+          permitted=0
+          for login in "${allowed_actors[@]}"; do
+            if [ "$ACTOR" = "$login" ]; then
+              permitted=1
+              break
+            fi
+          done
+          if [ "$permitted" -ne 1 ]; then
+            echo "Denied: only '${ALLOWED_ACTOR}' may run this workflow." >&2
+            echo "Actor: '${ACTOR}'." >&2
+            exit 1
+          fi
+          # Built from the RESOLVED repository, so the phrase proves the caller
+          # knows what will actually be deleted.
+          expected_phrase="DELETE REPO ${REPOSITORY}"
+          if [ "$TYPED_CONFIRM" != "$expected_phrase" ]; then
+            echo "Denied: confirmation phrase did not match exactly." >&2
+            echo "Expected: ${expected_phrase}" >&2
+            echo "Got:      ${TYPED_CONFIRM}" >&2
+            echo "" >&2
+            echo "Nothing was deleted and Azure was never contacted." >&2
+            exit 1
+          fi
+          echo "Safeguard passed. Target repository: ${REPOSITORY}"
+
+      - name: Sign in to Azure
+        uses: rubensgomes-org/azure-workflows/.github/actions/azure-login@v0
+        with:
+          client-id: ${{ inputs.azure-client-id }}
+          client-secret: ${{ secrets.azure-client-secret }}
+          tenant-id: ${{ inputs.azure-tenant-id }}
+          subscription-id: ${{ inputs.azure-subscription-id }}
+
+      - name: Verify the registry exists
+        id: registry
+        uses: rubensgomes-org/azure-workflows/.github/actions/verify-acr-registry@v0
+        with:
+          registry-name: ${{ inputs.registry-name }}
+
+      # Deliberately "az acr repository list" and not "show": "show" cannot
+      # distinguish "absent" from "the registry could not be reached", so a
+      # transient outage would look like a successful no-op and the run would
+      # go green having deleted nothing.
+      - name: Check whether the repository exists
+        id: exists
+        shell: bash
+        env:
+          REPOSITORY: ${{ steps.repo.outputs.repository }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Check whether the repository exists"
+          echo " az acr repository list --name ${ACR_NAME}"
+          echo "=============================================================="
+          set -euo pipefail
+          if ! repositories="$(az acr repository list --name "$ACR_NAME" \
+                                 -o tsv)"; then
+            echo "Could not list the repositories in '${ACR_NAME}'." >&2
+            echo "That is a registry-level failure -- a network or token" >&2
+            echo "problem, or a principal without read access -- and NOT a" >&2
+            echo "missing repository. Nothing was deleted." >&2
+            exit 1
+          fi
+          # -F -x: whole line, literal. A substring match would let
+          # "lab/azure-acr" be satisfied by "lab/azure-acr-legacy".
+          if ! printf '%s\n' "$repositories" | grep -Fxq "$REPOSITORY"; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Repository '${REPOSITORY}' is not in ${ACR_NAME}."
+            echo "Nothing to delete; the delete step will be skipped."
+            exit 0
+          fi
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+          echo "Repository '${REPOSITORY}' exists. These tags will be"
+          echo "PERMANENTLY deleted along with it:"
+          tags="$(az acr repository show-tags --name "$ACR_NAME" \
+                    --repository "$REPOSITORY" -o tsv 2>/dev/null || true)"
+          if [ -z "$tags" ]; then
+            echo "  <untagged manifests only>"
+          else
+            # sed, not ${var//}, because this indents EVERY line.
+            # shellcheck disable=SC2001
+            echo "$tags" | sed 's/^/  /'
+          fi
+
+      - name: Delete the repository
+        if: steps.exists.outputs.exists == 'true'
+        shell: bash
+        env:
+          REPOSITORY: ${{ steps.repo.outputs.repository }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Delete the repository"
+          echo " az acr repository delete --name ${ACR_NAME}" \
+               "--repository ${REPOSITORY}"
+          echo "=============================================================="
+          set -euo pipefail
+          az acr repository delete \
+            --name "$ACR_NAME" \
+            --repository "$REPOSITORY" \
+            --yes
+
+      # Reads the catalog back: a delete that reported success but left the
+      # repository behind must fail the run, not pass it.
+      - name: Report the outcome
+        shell: bash
+        env:
+          REPOSITORY: ${{ steps.repo.outputs.repository }}
+          EXISTED: ${{ steps.exists.outputs.exists }}
+          ACR_LOGIN_SERVER: ${{ steps.registry.outputs.login-server }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Report the outcome"
+          echo "=============================================================="
+          set -euo pipefail
+          if [ "$EXISTED" != "true" ]; then
+            echo "Nothing was deleted."
+            echo "  Registry:   ${ACR_NAME} (${ACR_LOGIN_SERVER})"
+            echo "  Repository: ${REPOSITORY} -- not present"
+            exit 0
+          fi
+          if ! repositories="$(az acr repository list --name "$ACR_NAME" \
+                                 -o tsv)"; then
+            echo "Deleted '${REPOSITORY}', but the catalog could not be read" \
+              >&2
+            echo "back to confirm it. Re-run to verify." >&2
+            exit 1
+          fi
+          if printf '%s\n' "$repositories" | grep -Fxq "$REPOSITORY"; then
+            echo "Repository '${REPOSITORY}' is STILL in ${ACR_NAME}." >&2
+            echo "The delete step reported success, so it did not take" \
+                 "effect." >&2
+            exit 1
+          fi
+          echo "Deleted."
+          echo "  Registry:   ${ACR_NAME} (${ACR_LOGIN_SERVER})"
+          echo "  Repository: ${REPOSITORY} -- gone, with all of its tags" \
+               "and manifests"

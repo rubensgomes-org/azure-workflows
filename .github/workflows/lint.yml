@@ -1,0 +1,75 @@
+# =============================================================================
+# lint
+#
+# Self-CI for azure-workflows. Every consumer runs this repository's YAML, so
+# a syntax error here breaks ten repositories at once. This is the only gate
+# that sees the files before they do.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      # shellcheck stays ENABLED. The few places that must word-split carry an
+      # inline "shellcheck disable=" with the reason, so the linter keeps its
+      # value on everything else.
+      - name: actionlint
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
+
+      # A reusable workflow pinned by a consumer at @v0 must not pull its
+      # composite actions from somewhere else, or the pin buys nothing. All
+      # internal references must therefore agree on a single ref.
+      - name: Verify internal action refs agree
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Verify internal action refs agree"
+          echo "=============================================================="
+          set -euo pipefail
+          repo='rubensgomes-org/azure-workflows'
+          pat="uses: ${repo}/[^@]+@[A-Za-z0-9._/-]+"
+          refs="$(grep -rhoE "$pat" .github/workflows \
+                  | sed 's/.*@//' | sort -u)"
+          if [ -z "$refs" ]; then
+            echo "No internal action references found -- expected several." >&2
+            exit 1
+          fi
+          count="$(printf '%s\n' "$refs" | wc -l | tr -d ' ')"
+          if [ "$count" -ne 1 ]; then
+            echo "Internal action references disagree:" >&2
+            # Unquoted on purpose: one line per ref.
+            # shellcheck disable=SC2086
+            printf '  %s\n' $refs >&2
+            echo "" >&2
+            echo "They must all point at the same ref, so that a consumer" >&2
+            echo "pinning @v0 gets the v0 actions too." >&2
+            exit 1
+          fi
+          echo "All internal action references pin @${refs}"

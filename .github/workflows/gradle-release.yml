@@ -1,0 +1,143 @@
+# =============================================================================
+# gradle-release
+#
+# Reusable workflow: runs "./gradlew release" (net.researchgate.release).
+#
+# WRITES TO THE REPOSITORY. The plugin strips -SNAPSHOT, commits, tags, bumps
+# to the next snapshot, commits again and pushes both commits and the tag.
+# The caller must therefore grant "permissions: contents: write".
+#
+# It deliberately does NOT use the gradle-build action: the release plugin
+# runs its own verification, and a second full build would only slow the
+# release.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: gradle-release
+
+on:
+  workflow_call:
+    inputs:
+      release-branch:
+        description: >-
+          Branch to release from. Must match the release plugin requireBranch
+          setting.
+        required: false
+        default: main
+        type: string
+      properties-file:
+        description: 'Properties file holding developerName and developerEmail.'
+        required: false
+        default: gradle.properties
+        type: string
+      java-version:
+        description: >-
+          Java language version. Must match the consumer build toolchain pin.
+        required: false
+        default: '25'
+        type: string
+      java-distribution:
+        description: >-
+          JDK distribution. Must match the consumer build toolchain vendor pin.
+        required: false
+        default: microsoft
+        type: string
+      gradle-args:
+        description: >-
+          Flags passed to every ./gradlew invocation. Word-split by bash, so
+          unquoted.
+        required: false
+        default: >-
+          --console=plain
+          -Dorg.gradle.logging.level=lifecycle
+          -Porg.gradle.java.installations.auto-download=false
+        type: string
+      runs-on:
+        description: 'Runner label for the job.'
+        required: false
+        default: ubuntu-latest
+        type: string
+      timeout-minutes:
+        description: 'Job timeout in minutes.'
+        required: false
+        default: 30
+        type: number
+
+    secrets:
+      # Used for both the release push and the Packages read: a classic PAT
+      # with repo + read:packages, not the per-run GITHUB_TOKEN.
+      packages-token:
+        description: >-
+          PAT with repo + read:packages. Used for the push AND the Packages
+          read.
+        required: true
+
+jobs:
+  release:
+    name: release
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+
+    env:
+      PACKAGES_USER: ${{ github.actor }}
+      PACKAGES_TOKEN: ${{ secrets.packages-token }}
+      GRADLE_ARGS: ${{ inputs.gradle-args }}
+      PROPERTIES_FILE: ${{ inputs.properties-file }}
+
+    steps:
+      # Checks out the CALLING repository. "ref" is explicit because a release
+      # must never run from a detached tag or a feature branch, and fetch-depth
+      # 0 is required: the release plugin inspects tags to compute the version.
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release-branch }}
+          fetch-depth: 0
+          token: ${{ secrets.packages-token }}
+
+      # The plugin makes real commits, and git refuses to commit without an
+      # identity. Read it from the consumer's properties file so the release
+      # commits are attributed to the same person the POM names.
+      - name: Configure the git identity used for release commits
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Configure the git identity used for release commits"
+          echo "=============================================================="
+          set -euo pipefail
+          name="$(sed -n 's/^developerName=//p'  "$PROPERTIES_FILE")"
+          email="$(sed -n 's/^developerEmail=//p' "$PROPERTIES_FILE")"
+          if [ -z "$name" ] || [ -z "$email" ]; then
+            echo "developerName or developerEmail not found in" \
+                 "${PROPERTIES_FILE}." >&2
+            echo "The release plugin cannot commit without a git identity." >&2
+            exit 1
+          fi
+          git config user.name  "$name"
+          git config user.email "$email"
+          git config --get user.name
+          git config --get user.email
+
+      - name: Set up Java and Gradle
+        uses: rubensgomes-org/azure-workflows/.github/actions/setup-java-gradle@v0
+        with:
+          java-version: ${{ inputs.java-version }}
+          java-distribution: ${{ inputs.java-distribution }}
+
+      - name: release
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: release"
+          echo " ./gradlew release"
+          echo "=============================================================="
+          set -euo pipefail
+          export GITHUB_USER="$PACKAGES_USER"
+          export GITHUB_TOKEN="$PACKAGES_TOKEN"
+          # $GRADLE_ARGS is intentionally unquoted: bash word-splitting is how
+          # the flags become separate arguments.
+          # shellcheck disable=SC2086
+          ./gradlew $GRADLE_ARGS release

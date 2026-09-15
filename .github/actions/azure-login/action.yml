@@ -1,0 +1,80 @@
+# =============================================================================
+# azure-login
+#
+# Signs the Azure CLI in as a service principal and selects the subscription.
+# Nothing else: no checkout, no resource lookup.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: azure-login
+description: >-
+  Signs the Azure CLI in as a service principal and selects the subscription.
+
+inputs:
+  client-id:
+    description: 'Service principal application (client) ID.'
+    required: true
+  client-secret:
+    description: 'Service principal client secret.'
+    required: true
+  tenant-id:
+    description: 'Entra ID tenant ID the service principal belongs to.'
+    required: true
+  subscription-id:
+    description: 'Subscription to select after signing in.'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Sign in to Azure
+      shell: bash
+      env:
+        AZURE_CLIENT_ID: ${{ inputs.client-id }}
+        AZURE_CLIENT_SECRET: ${{ inputs.client-secret }}
+        AZURE_TENANT_ID: ${{ inputs.tenant-id }}
+        AZURE_SUBSCRIPTION_ID: ${{ inputs.subscription-id }}
+        CONSUMER_REPO: ${{ github.repository }}
+      run: |
+        echo "=============================================================="
+        echo " STEP: Sign in to Azure"
+        echo "=============================================================="
+        set -euo pipefail
+        # Check all four before failing, so one run reports every missing
+        # value instead of making the caller rediscover them one at a time.
+        # An unset variable or secret arrives as the empty string, not as an
+        # error.
+        #
+        # Only the client secret is a secret; the other three are Actions
+        # VARIABLES. They are configured and mapped in different places, so the
+        # message names which is which rather than sending the reader to the
+        # secrets page for all four.
+        missing=0
+        for v in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+          if [ -z "${!v:-}" ]; then
+            echo "Missing required Actions variable: ${v}"
+            missing=1
+          fi
+        done
+        if [ -z "${AZURE_CLIENT_SECRET:-}" ]; then
+          echo "Missing required Actions secret: AZURE_CLIENT_SECRET"
+          missing=1
+        fi
+        if [ "$missing" -ne 0 ]; then
+          echo "The calling workflow in ${CONSUMER_REPO} did not supply them."
+          echo "Variables are mapped into the reusable workflow's 'with:' block"
+          echo "and the secret into its 'secrets:' block. Check that the"
+          echo "organization Actions variables and secrets exist and are shared"
+          echo "with that repository."
+          exit 1
+        fi
+        az login --service-principal \
+          --username "$AZURE_CLIENT_ID" \
+          --password "$AZURE_CLIENT_SECRET" \
+          --tenant   "$AZURE_TENANT_ID" \
+          --output none
+        az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+        echo "Signed in."

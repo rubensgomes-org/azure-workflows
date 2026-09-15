@@ -1,0 +1,270 @@
+# =============================================================================
+# release
+#
+# The single gate between a pushed tag and a release. Fires on v*.*.*, checks
+# the tag is honest, and only then moves the major tag and publishes a GitHub
+# Release whose notes are the CHANGELOG section for that version.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  # Re-runs a release. Dispatch from the TAG ref -- dispatching from a branch
+  # fails validate immediately, because `main` is not vX.Y.Z.
+  workflow_dispatch:
+
+# Read-only by default. The two jobs that write raise it themselves, so the
+# validate job cannot move a tag or cut a release even by accident.
+permissions:
+  contents: read
+
+concurrency:
+  # Keyed on the tag: two different releases never serialise behind each
+  # other, but a re-run of the same tag cannot race itself. Never
+  # cancel-in-progress -- a half-run release job is worse than a slow one.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Everything that can say no. Runs before anything writes.
+  # -------------------------------------------------------------------------
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    outputs:
+      version: ${{ steps.gate.outputs.version }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      # The tag is the source of truth for the version, so the only drift
+      # possible is a tag with no changelog behind it. That is what this
+      # catches -- and it runs first, because it is the cheapest check here.
+      - name: Verify tag shape and CHANGELOG entry
+        id: gate
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Verify tag shape and CHANGELOG entry"
+          echo "=============================================================="
+          set -euo pipefail
+
+          version="${RELEASE_TAG#v}"
+
+          # Also the guard against a workflow_dispatch fired from a branch:
+          # github.ref_name is then 'main', which is not MAJOR.MINOR.PATCH.
+          semver='^[0-9]+\.[0-9]+\.[0-9]+$'
+          if ! printf '%s' "$version" | grep -qE "$semver"; then
+            echo "::error::Ref '${RELEASE_TAG}' is not vMAJOR.MINOR.PATCH."
+            echo "Dispatch this workflow from the TAG ref, not from a branch."
+            exit 1
+          fi
+
+          if ! grep -q "^## \[${version}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [${version}]' section."
+            exit 1
+          fi
+
+          echo "Release tag : ${RELEASE_TAG}"
+          echo "Version     : ${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      # The same two checks lint.yml runs on main. Repeated here because a tag
+      # can name any commit, including one lint never saw.
+      - name: actionlint
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
+
+      # A reusable workflow pinned by a consumer at @v0 must not pull its
+      # composite actions from somewhere else, or the pin buys nothing. All
+      # internal references must therefore agree on a single ref.
+      - name: Verify internal action refs agree
+        id: refs
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Verify internal action refs agree"
+          echo "=============================================================="
+          set -euo pipefail
+          repo='rubensgomes-org/azure-workflows'
+          pat="uses: ${repo}/[^@]+@[A-Za-z0-9._/-]+"
+          refs="$(grep -rhoE "$pat" .github/workflows \
+                  | sed 's/.*@//' | sort -u)"
+          if [ -z "$refs" ]; then
+            echo "No internal action references found -- expected several." >&2
+            exit 1
+          fi
+          count="$(printf '%s\n' "$refs" | wc -l | tr -d ' ')"
+          if [ "$count" -ne 1 ]; then
+            echo "Internal action references disagree:" >&2
+            # Unquoted on purpose: one line per ref.
+            # shellcheck disable=SC2086
+            printf '  %s\n' $refs >&2
+            echo "" >&2
+            echo "They must all point at the same ref, so that a consumer" >&2
+            echo "pinning @v0 gets the v0 actions too." >&2
+            exit 1
+          fi
+          echo "All internal action references pin @${refs}"
+          echo "ref=${refs}" >> "$GITHUB_OUTPUT"
+
+      # The check above proves the internal refs agree with EACH OTHER. It
+      # cannot prove they agree with the tag being cut, because lint runs on
+      # main where no tag is in play. Here there is one, so the gap closes:
+      # cutting v1.0.0 without first repointing every @v0 to @v1 would publish
+      # workflows that still pull v0 actions, and @v1 would be a lie on the day
+      # it was created.
+      - name: Verify internal action refs match this release's major
+        shell: bash
+        env:
+          VERSION: ${{ steps.gate.outputs.version }}
+          INTERNAL_REF: ${{ steps.refs.outputs.ref }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Verify internal action refs match this release's major"
+          echo "=============================================================="
+          set -euo pipefail
+          expected="v${VERSION%%.*}"
+          if [ "$INTERNAL_REF" != "$expected" ]; then
+            echo "::error::Internal action refs pin @${INTERNAL_REF}," \
+                 "but this release is ${expected}."
+            echo "Repoint every internal 'uses:' to @${expected} in a" >&2
+            echo "commit on main, then re-tag. Releasing as-is would ship" >&2
+            echo "${expected} workflows that still pull @${INTERNAL_REF}" >&2
+            echo "actions." >&2
+            exit 1
+          fi
+          echo "Internal refs @${INTERNAL_REF} match release major ${expected}"
+
+  # -------------------------------------------------------------------------
+  # Moves the major tag onto every vX.Y.Z release, so consumers can pin @vX and
+  # receive patches without editing ten repositories. The project is at 0.x, so
+  # the tag being moved today is v0.
+  #
+  # NOTE ON 0.x: a moving v0 carries BREAKING changes to consumers, because 0.x
+  # makes no compatibility promise. That is the accepted trade while this is
+  # pre-1.0; consumers wanting immutability pin the full vX.Y.Z instead.
+  #
+  # The reusable workflows pin their own composite actions at the SAME major
+  # tag, which is why this must keep working: it is what makes @v0
+  # self-consistent.
+  # -------------------------------------------------------------------------
+  tag-major:
+    name: tag-major
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Move the major tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Move the major tag"
+          echo "=============================================================="
+          set -euo pipefail
+          major="${RELEASE_TAG%%.*}"
+          if [ "$major" = "$RELEASE_TAG" ] || [ -z "$major" ]; then
+            echo "Could not derive a major tag from '${RELEASE_TAG}'." >&2
+            exit 1
+          fi
+          git config user.name  "github-actions[bot]"
+          bot_email="41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "$bot_email"
+          # -f because the whole point is to move an existing tag.
+          git tag -f "$major" "$RELEASE_TAG"
+          git push -f origin "refs/tags/${major}"
+          echo "Moved ${major} to ${RELEASE_TAG}"
+
+  # -------------------------------------------------------------------------
+  # Publishes the GitHub Release. Runs alongside tag-major; the ordering that
+  # matters is that neither starts until validate is green.
+  # -------------------------------------------------------------------------
+  publish:
+    name: publish
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      VERSION: ${{ needs.validate.outputs.version }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      # awk prints everything between "## [<version>]" and the next "## ["
+      # heading. Written to a file rather than an output variable so newlines
+      # and markdown survive intact.
+      - name: Build release notes from CHANGELOG
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Build release notes from CHANGELOG"
+          echo "=============================================================="
+          set -euo pipefail
+
+          awk -v ver="${VERSION}" '
+            $0 == "## [" ver "]" ||
+              index($0, "## [" ver "] ") == 1 { f = 1; next }
+            f && /^## \[/ { exit }
+            f { print }
+          ' CHANGELOG.md > release-notes.md
+
+          if [ ! -s release-notes.md ]; then
+            echo "::error::Extracted release notes for ${VERSION} are empty."
+            exit 1
+          fi
+
+          echo "----- release notes -----"
+          cat release-notes.md
+
+      # Idempotent-ish: if the release already exists (a re-run), `gh release
+      # create` fails, so we edit instead. Keeps re-runs from being a dead end.
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "=============================================================="
+          echo " STEP: Publish GitHub Release"
+          echo "=============================================================="
+          set -euo pipefail
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} already exists - updating notes."
+            gh release edit "${RELEASE_TAG}" \
+              --title "${RELEASE_TAG}" \
+              --notes-file release-notes.md
+          else
+            gh release create "${RELEASE_TAG}" \
+              --title "${RELEASE_TAG}" \
+              --notes-file release-notes.md
+          fi
