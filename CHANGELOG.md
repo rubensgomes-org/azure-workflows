@@ -28,6 +28,14 @@ the GitHub Release notes.
 
 ### Fixed
 
+## [0.0.2] - 2026-09-14
+
+### Added
+
+### Changed
+
+### Fixed
+
 - fixed defaults
 
 ## [0.0.1] - 2026-09-14
