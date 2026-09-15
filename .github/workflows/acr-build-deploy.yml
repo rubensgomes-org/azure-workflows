@@ -23,8 +23,7 @@ on:
       environment:
         description: >-
           Image namespace, used as <environment>/<artifactId>:<tag>.
-        required: false
-        default: dev
+        required: true
         type: string
       tag:
         description: >-
@@ -36,46 +35,7 @@ on:
         description: >-
           Name of the EXISTING Azure Container Registry to push to (not the
           login server).
-        required: false
-        default: crrgomesdev01
-        type: string
-      project-path:
-        description: >-
-          Gradle project path to build, without a trailing colon (e.g. ":app").
-        required: false
-        default: ':app'
-        type: string
-      dotenv-path:
-        description: >-
-          Local temporary file the Gradle build writes environment
-          information to, such as APP_VERSION.
-        required: false
-        default: .env
-        type: string
-      artifact-properties-path:
-        description: >-
-          Properties file holding artifactId, which names the image repository.
-        required: false
-        default: app/gradle.properties
-        type: string
-      docker-context:
-        description: 'Build context uploaded to ACR Tasks.'
-        required: false
-        default: '.'
-        type: string
-      smoke-test-entrypoint:
-        description: >
-          ENTRYPOINT override for the smoke test. The default image ENTRYPOINT
-          is "java -XX:AOTCache=app.aot -jar application.jar", so it must be
-          overridden to run anything else. Set empty to use the image
-          ENTRYPOINT.
-        required: false
-        default: java
-        type: string
-      smoke-test-args:
-        description: 'Arguments passed to the smoke-tested image.'
-        required: false
-        default: '--version'
+        required: true
         type: string
       java-version:
         description: >-
@@ -88,21 +48,6 @@ on:
           JDK distribution. Must match the consumer build toolchain vendor pin.
         required: false
         default: microsoft
-        type: string
-      gradle-args:
-        description: >-
-          Flags passed to every ./gradlew invocation. Word-split by bash, so
-          unquoted.
-        required: false
-        default: >-
-          --console=plain
-          -Dorg.gradle.logging.level=lifecycle
-          -Porg.gradle.java.installations.auto-download=false
-        type: string
-      runs-on:
-        description: 'Runner label for the job.'
-        required: false
-        default: ubuntu-latest
         type: string
       timeout-minutes:
         description: 'Job timeout in minutes.'
@@ -139,15 +84,19 @@ on:
 jobs:
   build:
     name: build
-    runs-on: ${{ inputs.runs-on }}
+    runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout-minutes }}
 
     env:
       PACKAGES_USER: ${{ github.actor }}
       PACKAGES_TOKEN: ${{ secrets.packages-token }}
       ACR_NAME: ${{ inputs.registry-name }}
-      GRADLE_ARGS: ${{ inputs.gradle-args }}
-      PROJECT_PATH: ${{ inputs.project-path }}
+      # Not inputs: fixed across every consumer.
+      ARTIFACT_PROPERTIES_PATH: app/gradle.properties
+      DOTENV_PATH: .env
+      DOCKER_CONTEXT: '.'
+      SMOKE_ENTRYPOINT: java
+      SMOKE_ARGS: '--version'
 
     steps:
       # Checks out the CALLING repository, not azure-workflows.
@@ -181,8 +130,6 @@ jobs:
         with:
           packages-user: ${{ env.PACKAGES_USER }}
           packages-token: ${{ env.PACKAGES_TOKEN }}
-          gradle-args: ${{ env.GRADLE_ARGS }}
-          project-path: ${{ env.PROJECT_PATH }}
 
       # Must run AFTER the build: APP_VERSION is written by generateDotEnv,
       # which hangs off "tasks.build".
@@ -192,8 +139,6 @@ jobs:
         env:
           INPUT_TAG: ${{ inputs.tag }}
           ENVIRONMENT: ${{ inputs.environment }}
-          DOTENV_PATH: ${{ inputs.dotenv-path }}
-          ARTIFACT_PROPERTIES_PATH: ${{ inputs.artifact-properties-path }}
         run: |
           echo "=============================================================="
           echo " STEP: Resolve the image coordinates"
@@ -229,7 +174,6 @@ jobs:
         env:
           IMAGE: ${{ steps.image.outputs.image }}
           APP_VERSION: ${{ steps.image.outputs.app_version }}
-          DOCKER_CONTEXT: ${{ inputs.docker-context }}
         run: |
           echo "=============================================================="
           echo " STEP: Build and push the image with az acr build"
@@ -272,8 +216,6 @@ jobs:
         shell: bash
         env:
           IMAGE: ${{ steps.image.outputs.image }}
-          SMOKE_ENTRYPOINT: ${{ inputs.smoke-test-entrypoint }}
-          SMOKE_ARGS: ${{ inputs.smoke-test-args }}
         run: |
           echo "=============================================================="
           echo " STEP: Smoke-test the image with az acr run"

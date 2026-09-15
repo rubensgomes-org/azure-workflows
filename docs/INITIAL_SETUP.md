@@ -189,9 +189,9 @@ Consumer projects must match the layout of
 
 | Assumption                                                    | Input                               |
 |---------------------------------------------------------------|-------------------------------------|
-| Gradle subproject is `:app`                                   | `project-path`                      |
+| Gradle subproject is `:app`                                   | fixed, not an input                 |
 | Toolchain is Microsoft JDK 25                                 | `java-version`, `java-distribution` |
-| `artifactId` is in `app/gradle.properties`                    | `artifact-properties-path`          |
+| `artifactId` is in `app/gradle.properties`                    | fixed, not an input                 |
 | `developerName` / `developerEmail` are in `gradle.properties` | `properties-file`                   |
 
 ---

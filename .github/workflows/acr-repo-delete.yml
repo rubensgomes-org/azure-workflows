@@ -34,15 +34,13 @@ on:
         description: >-
           Image namespace. With artifactId this forms the repository
           <environment>/<artifactId>.
-        required: false
-        default: dev
+        required: true
         type: string
       registry-name:
         description: >-
           Name of the EXISTING Azure Container Registry to delete from (not the
           login server).
-        required: false
-        default: crrgomesdev01
+        required: true
         type: string
       confirm:
         description: >-
@@ -57,17 +55,6 @@ on:
           working.
         required: false
         default: 'rubensgomes,rubens-gomes_3CC'
-        type: string
-      artifact-properties-path:
-        description: >-
-          Properties file holding artifactId, which names the image repository.
-        required: false
-        default: app/gradle.properties
-        type: string
-      runs-on:
-        description: 'Runner label for the job.'
-        required: false
-        default: ubuntu-latest
         type: string
       timeout-minutes:
         description: 'Job timeout in minutes.'
@@ -100,13 +87,15 @@ on:
 jobs:
   delete:
     name: delete
-    runs-on: ${{ inputs.runs-on }}
+    runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout-minutes }}
 
     env:
       ACR_NAME: ${{ inputs.registry-name }}
       ENVIRONMENT: ${{ inputs.environment }}
       ALLOWED_ACTOR: ${{ inputs.allowed-actor }}
+      # Not an input: every consumer's artifactId lives at this fixed path.
+      ARTIFACT_PROPERTIES_PATH: app/gradle.properties
 
     steps:
       # Only to read the consumer's properties file. No build runs here.
@@ -116,8 +105,6 @@ jobs:
       - name: Resolve the repository coordinates
         id: repo
         shell: bash
-        env:
-          ARTIFACT_PROPERTIES_PATH: ${{ inputs.artifact-properties-path }}
         run: |
           echo "=============================================================="
           echo " STEP: Resolve the repository coordinates"

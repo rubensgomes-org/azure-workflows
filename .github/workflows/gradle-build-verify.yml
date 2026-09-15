@@ -24,12 +24,6 @@ name: gradle-build-verify
 on:
   workflow_call:
     inputs:
-      project-path:
-        description: >-
-          Gradle project path to build, without a trailing colon (e.g. ":app").
-        required: false
-        default: ':app'
-        type: string
       java-version:
         description: >-
           Java language version. Must match the consumer build toolchain pin.
@@ -42,27 +36,12 @@ on:
         required: false
         default: microsoft
         type: string
-      gradle-args:
-        description: >-
-          Flags passed to every ./gradlew invocation. Word-split by bash, so
-          unquoted.
-        required: false
-        default: >-
-          --console=plain
-          -Dorg.gradle.logging.level=lifecycle
-          -Porg.gradle.java.installations.auto-download=false
-        type: string
       run-sonar:
         description: >-
           Run the SonarCloud analysis and block on its quality gate. Opt-in.
         required: false
         default: false
         type: boolean
-      runs-on:
-        description: 'Runner label for the job.'
-        required: false
-        default: ubuntu-latest
-        type: string
       timeout-minutes:
         description: 'Job timeout in minutes.'
         required: false
@@ -101,7 +80,7 @@ on:
 jobs:
   build-verify:
     name: build-verify
-    runs-on: ${{ inputs.runs-on }}
+    runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout-minutes }}
 
     env:
@@ -109,8 +88,12 @@ jobs:
       PACKAGES_USER: ${{ github.actor }}
       PACKAGES_TOKEN: ${{ secrets.packages-token }}
       SONAR_TOKEN: ${{ secrets.sonar-token }}
-      GRADLE_ARGS: ${{ inputs.gradle-args }}
-      PROJECT_PATH: ${{ inputs.project-path }}
+      # Not inputs: match the gradle-build action's own defaults.
+      GRADLE_ARGS: >-
+        --console=plain
+        -Dorg.gradle.logging.level=lifecycle
+        -Porg.gradle.java.installations.auto-download=false
+      PROJECT_PATH: ':app'
 
     steps:
       # Checks out the CALLING repository, not azure-workflows. That is why the
@@ -132,8 +115,6 @@ jobs:
         with:
           packages-user: ${{ env.PACKAGES_USER }}
           packages-token: ${{ env.PACKAGES_TOKEN }}
-          gradle-args: ${{ env.GRADLE_ARGS }}
-          project-path: ${{ env.PROJECT_PATH }}
 
       # Skipped unless the caller opts in with run-sonar: true. A skipped step
       # here is the expected outcome, not a misconfiguration.

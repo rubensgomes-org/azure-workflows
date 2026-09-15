@@ -26,6 +26,15 @@ the GitHub Release notes.
 
 ### Changed
 
+- **Breaking:** `environment` and `registry-name` are now required inputs
+  (no default) on `acr-build-deploy` and `acr-repo-delete`.
+- **Breaking:** `runs-on` is no longer an input; every reusable workflow now
+  runs on `ubuntu-latest`.
+- **Breaking:** `project-path`, `gradle-args`, `artifact-properties-path`,
+  `docker-context`, `smoke-test-entrypoint`, `smoke-test-args`, and
+  `dotenv-path` are no longer inputs; each is fixed at its former default
+  value.
+
 ### Fixed
 
 ## [0.0.5] - 2026-09-15
