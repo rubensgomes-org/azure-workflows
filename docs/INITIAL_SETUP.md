@@ -106,8 +106,8 @@ on:
           Name of the EXISTING Azure Container Registry to push to (not the
           login server).
         required: false
-        #default: crrgomeslab01
-        default: crrgomeslab01
+        #default: crrgomesdev01
+        default: crrgomesdev01
         type: string
 permissions:
   contents: read
@@ -151,7 +151,7 @@ on:
           Name of the EXISTING Azure Container Registry to delete from (not the
           login server).
         required: false
-        default: crrgomeslab01
+        default: crrgomesdev01
         type: string
       confirm:
         description: >

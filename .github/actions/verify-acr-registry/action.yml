@@ -52,7 +52,7 @@ runs:
           echo "" >&2
           echo "This workflow does not create registries. Pass an existing" >&2
           echo "name via the registry-name input, or provision it from the" >&2
-          echo "rgomes-azure-iac repository first." >&2
+          echo "azure-iac repository first." >&2
           echo "" >&2
           echo "Registries this principal CAN see:" >&2
           az acr list --query '[].name' -o tsv >&2 || echo "  (none)" >&2

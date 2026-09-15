@@ -37,7 +37,7 @@ on:
           Name of the EXISTING Azure Container Registry to push to (not the
           login server).
         required: false
-        default: crrgomeslab01
+        default: crrgomesdev01
         type: string
       project-path:
         description: >-
