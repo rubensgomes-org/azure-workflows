@@ -7,11 +7,17 @@
 #
 # Two independent safeguards run BEFORE any Azure credential is touched:
 #   1. the actor must be one of the logins in the allowed-actor input;
-#   2. the caller must have typed "DELETE REPO <environment>/<artifactId>"
-#      exactly, and that phrase is built from the RESOLVED repository, so it
-#      cannot be satisfied by guessing what the inputs will produce.
+#   2. the caller must have typed "DELETE REPO <registry-name>
+#      <environment>/<artifactId>" exactly, and that phrase is built from the
+#      RESOLVED registry and repository, so it cannot be satisfied by guessing
+#      what the inputs will produce.
 # Keep the sign-in step after them. If the safeguard fails, nothing was
 # deleted and Azure was never contacted, and the log must be able to say so.
+#
+# Deleting is idempotent: a repository that is already absent, or a registry
+# that is already absent, is the state the caller asked for, so the run
+# reports what it found and succeeds. Only a failure to ASK Azure -- a
+# network, token or permission problem -- fails the run.
 #
 # NOTE: acr-destroy.yml in rubensgomes-org/azure-iac destroys the
 # registry itself. This one only empties a repository inside a registry that
@@ -43,7 +49,8 @@ on:
         type: string
       confirm:
         description: >-
-          Must equal "DELETE REPO <environment>/<artifactId>" exactly.
+          Must equal "DELETE REPO <registry-name> <environment>/<artifactId>"
+          exactly.
         required: true
         type: string
       allowed-actor:
@@ -161,9 +168,9 @@ jobs:
             echo "Actor: '${ACTOR}'." >&2
             exit 1
           fi
-          # Built from the RESOLVED repository, so the phrase proves the caller
-          # knows what will actually be deleted.
-          expected_phrase="DELETE REPO ${REPOSITORY}"
+          # Built from the RESOLVED registry and repository, so the phrase
+          # proves the caller knows what will actually be deleted.
+          expected_phrase="DELETE REPO ${ACR_NAME} ${REPOSITORY}"
           if [ "$TYPED_CONFIRM" != "$expected_phrase" ]; then
             echo "Denied: confirmation phrase did not match exactly." >&2
             echo "Expected: ${expected_phrase}" >&2
@@ -182,11 +189,56 @@ jobs:
           tenant-id: ${{ inputs.azure-tenant-id }}
           subscription-id: ${{ inputs.azure-subscription-id }}
 
-      - name: Verify the registry exists
+      # A missing registry is NOT an error here. A repository cannot outlive
+      # the registry that held it, so "delete this repository" is already
+      # satisfied and the run reports "nothing to delete" and succeeds. This
+      # mirrors the repository-level check below, which has always treated an
+      # absent repository as success.
+      #
+      # The verify-acr-registry action is deliberately NOT used: it hard-fails
+      # on a missing registry. That is correct for acr-build-deploy, which
+      # cannot push without a login server, and wrong for a delete.
+      #
+      # "az acr list" and not "az acr show", for the same reason the
+      # repository check uses "list": "show" cannot distinguish "absent" from
+      # "the registry could not be reached", so a transient outage would look
+      # like a registry that was already gone and the run would go green
+      # having deleted nothing.
+      - name: Check whether the registry exists
         id: registry
-        uses: rubensgomes-org/azure-workflows/.github/actions/verify-acr-registry@v0
-        with:
-          registry-name: ${{ inputs.registry-name }}
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Check whether the registry exists"
+          echo " az acr list"
+          echo "=============================================================="
+          set -euo pipefail
+          if ! registries="$(az acr list --query '[].name' -o tsv)"; then
+            echo "Could not list the registries in this subscription." >&2
+            echo "That is a subscription-level failure -- a network or" >&2
+            echo "token problem, or a principal without read access -- and" >&2
+            echo "NOT a missing registry. Nothing was deleted." >&2
+            exit 1
+          fi
+          # -i: ACR names are case-insensitive in Azure, and "az acr list"
+          # returns the canonical casing. Matching case-sensitively would
+          # report a differently-cased name as absent and exit 0, which is
+          # the silent no-op this step exists to prevent.
+          if ! printf '%s\n' "$registries" | grep -Fxqi "$ACR_NAME"; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No registry named '${ACR_NAME}' in this subscription."
+            echo "Nothing to delete; the remaining steps are skipped."
+            exit 0
+          fi
+          login_server="$(az acr show --name "$ACR_NAME" \
+                            --query loginServer -o tsv)"
+          if [ -z "$login_server" ]; then
+            echo "Registry '${ACR_NAME}' returned an empty loginServer." >&2
+            exit 1
+          fi
+          echo "exists=true"                  >> "$GITHUB_OUTPUT"
+          echo "login-server=${login_server}" >> "$GITHUB_OUTPUT"
+          echo "Registry ${ACR_NAME} exists; login server is ${login_server}"
 
       # Deliberately "az acr repository list" and not "show": "show" cannot
       # distinguish "absent" from "the registry could not be reached", so a
@@ -194,6 +246,7 @@ jobs:
       # go green having deleted nothing.
       - name: Check whether the repository exists
         id: exists
+        if: steps.registry.outputs.exists == 'true'
         shell: bash
         env:
           REPOSITORY: ${{ steps.repo.outputs.repository }}
@@ -256,12 +309,19 @@ jobs:
         env:
           REPOSITORY: ${{ steps.repo.outputs.repository }}
           EXISTED: ${{ steps.exists.outputs.exists }}
+          REGISTRY_EXISTED: ${{ steps.registry.outputs.exists }}
           ACR_LOGIN_SERVER: ${{ steps.registry.outputs.login-server }}
         run: |
           echo "=============================================================="
           echo " STEP: Report the outcome"
           echo "=============================================================="
           set -euo pipefail
+          if [ "$REGISTRY_EXISTED" != "true" ]; then
+            echo "Nothing was deleted."
+            echo "  Registry:   ${ACR_NAME} -- not present"
+            echo "  Repository: ${REPOSITORY} -- cannot exist without it"
+            exit 0
+          fi
           if [ "$EXISTED" != "true" ]; then
             echo "Nothing was deleted."
             echo "  Registry:   ${ACR_NAME} (${ACR_LOGIN_SERVER})"

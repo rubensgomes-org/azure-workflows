@@ -26,6 +26,13 @@ the GitHub Release notes.
 
 ### Changed
 
+- `acr-repo-delete` now succeeds when the registry does not exist, matching
+  its existing behavior for a repository that does not exist. A failure to
+  query Azure still fails the run.
+- **Breaking:** the `acr-repo-delete` confirm phrase is now
+  `DELETE REPO <registry-name> <environment>/<artifactId>`, so a mistyped
+  registry cannot pass the safeguard.
+
 ### Fixed
 
 ## [0.0.2] - 2026-09-14
