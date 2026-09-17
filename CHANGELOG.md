@@ -24,6 +24,14 @@ the GitHub Release notes.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.0.8] - 2026-09-17
+
+### Added
+
 - New `poetry-build-verify` reusable workflow for Python/Poetry projects:
   runs the static type checker, static code analysis, and unit test
   coverage, with an opt-in SonarCloud quality gate.
