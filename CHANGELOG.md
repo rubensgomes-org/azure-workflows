@@ -26,6 +26,10 @@ the GitHub Release notes.
 
 ### Changed
 
+- **Breaking:** `acr-repo-delete` now requires a new `artifact-id` input
+  instead of reading `artifactId` from the caller's `app/gradle.properties`;
+  the workflow no longer checks out the caller's repository.
+
 ### Fixed
 
 ## [0.0.8] - 2026-09-17

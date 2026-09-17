@@ -42,6 +42,12 @@ on:
           login server).
         required: true
         type: string
+      artifact-id:
+        description: >-
+          Artifact ID. With environment this forms the repository
+          <environment>/<artifact-id>.
+        required: true
+        type: string
       confirm:
         description: >-
           Confirmation phrase: "DELETE REPO <registry-name>
@@ -62,11 +68,6 @@ on:
         required: false
         default: 15
         type: number
-      # Identifiers, not credentials: they name the principal, tenant and
-      # subscription but grant nothing without the client secret, which stays a
-      # secret. Declaring them as inputs lets callers map organization Actions
-      # VARIABLES into them, so the values stay readable in logs and settings
-      # instead of being masked as "***" during a failed sign-in.
       azure-client-id:
         description: 'Service principal application (client) ID.'
         required: true
@@ -95,34 +96,24 @@ jobs:
       ACR_NAME: ${{ inputs.registry-name }}
       ENVIRONMENT: ${{ inputs.environment }}
       ALLOWED_ACTOR: ${{ inputs.allowed-actor }}
-      # Not an input: every consumer's artifactId lives at this fixed path.
-      ARTIFACT_PROPERTIES_PATH: app/gradle.properties
 
     steps:
-      # Only to read the consumer's properties file. No build runs here.
-      - name: Check out the repository
-        uses: actions/checkout@v7
-
       - name: Resolve the repository coordinates
         id: repo
         shell: bash
+        env:
+          ARTIFACT_ID: ${{ inputs.artifact-id }}
         run: |
           echo "=============================================================="
           echo " STEP: Resolve the repository coordinates"
           echo "=============================================================="
           set -euo pipefail
-          artifact_id="$(sed -n 's/^artifactId=//p' \
-                           "$ARTIFACT_PROPERTIES_PATH")"
-          if [ -z "$artifact_id" ]; then
-            echo "artifactId not found in ${ARTIFACT_PROPERTIES_PATH}" >&2
-            exit 1
-          fi
           if [ -z "${ENVIRONMENT:-}" ]; then
             echo "The environment input resolved to empty." >&2
             exit 1
           fi
-          echo "repository=${ENVIRONMENT}/${artifact_id}" >> "$GITHUB_OUTPUT"
-          echo "Target repository: ${ENVIRONMENT}/${artifact_id}"
+          echo "repository=${ENVIRONMENT}/${ARTIFACT_ID}" >> "$GITHUB_OUTPUT"
+          echo "Target repository: ${ENVIRONMENT}/${ARTIFACT_ID}"
 
       # MUST stay ahead of the sign-in step. github.actor is the actor of the
       # CALLER's run, which is the human who pressed "Run workflow".
@@ -179,16 +170,6 @@ jobs:
       # satisfied and the run reports "nothing to delete" and succeeds. This
       # mirrors the repository-level check below, which has always treated an
       # absent repository as success.
-      #
-      # The verify-acr-registry action is deliberately NOT used: it hard-fails
-      # on a missing registry. That is correct for acr-build-deploy, which
-      # cannot push without a login server, and wrong for a delete.
-      #
-      # "az acr list" and not "az acr show", for the same reason the
-      # repository check uses "list": "show" cannot distinguish "absent" from
-      # "the registry could not be reached", so a transient outage would look
-      # like a registry that was already gone and the run would go green
-      # having deleted nothing.
       - name: Check whether the registry exists
         id: registry
         shell: bash
