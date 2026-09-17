@@ -154,9 +154,6 @@ jobs:
 
 ### acr-repo-delete
 
-The `description:` text is what the operator reads before typing the
-confirmation, so it is reproduced in full in the stub rather than summarised.
-
 ```yaml
 name: acr-repo-delete
 on:
@@ -176,16 +173,6 @@ on:
         required: false
         default: crrgomesdev01
         type: string
-      confirm:
-        description: >
-          EVERY TAG AND MANIFEST IN THE REPOSITORY IS DELETED PERMANENTLY.
-          There is no soft-delete and no recycle bin. Push anything you care
-          about elsewhere first.
-          SAFEGUARD: type EXACTLY
-          "DELETE REPO <registry-name> <environment>/<artifactId>" --
-          e.g. DELETE REPO crrgomeslab02 lab/azure-acr
-        required: true
-        type: string
 permissions:
   contents: read
 concurrency:
@@ -197,7 +184,6 @@ jobs:
     with:
       environment: ${{ inputs.environment }}
       registry-name: ${{ inputs.registry_name }}
-      confirm: ${{ inputs.confirm }}
       azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
       azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
       azure-subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
