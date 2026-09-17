@@ -101,3 +101,15 @@ certs/
 credentials.json
 .aws/
 .gcloud/
+
+###############################################################################
+# Sonar (static analysis built files)
+###############################################################################
+
+# SonarQube scanner files
+.sonar/
+.scannerwork/
+**/.scannerwork/
+
+# SonarLint local files (if using IDE plugins)
+.sonarlint/

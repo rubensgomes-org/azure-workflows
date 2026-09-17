@@ -1,0 +1,91 @@
+# =============================================================================
+# poetry-build-verify
+#
+# Reusable workflow: install dependencies, then run the static type checker,
+# static code analysis, and unit test coverage. The SonarCloud quality gate
+# is OPT-IN -- pass run-sonar: true to enable it.
+#
+# Reused by Rubens Gomes Python repository projects. Callers keep a thin
+# workflow_dispatch stub that owns the "Run workflow" button, the permissions
+# and the concurrency group; see README.md for a copy-paste stub.
+#
+# For this workflow to be re-used by other repositories in the same GitHub
+# organization, Settings -- Actions (General) -- Access must be set to
+# "Accessible from repositories in the 'rubensgomes-org' organization".
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: poetry-build-verify
+
+on:
+  workflow_call:
+    inputs:
+      run-sonar:
+        description: >-
+          Run the SonarCloud analysis and block on its quality gate. Opt-in.
+        required: false
+        default: false
+        type: boolean
+
+    secrets:
+      # Must be able to READ QUALITY GATE STATUS, not just submit analyses.
+      sonar-token:
+        description: 'SonarCloud token. Required when run-sonar is true.'
+        required: false
+
+jobs:
+  build-verify:
+    name: build-verify
+    runs-on: ubuntu-latest
+
+    env:
+      SONAR_TOKEN: ${{ secrets.sonar-token }}
+
+    steps:
+      # Checks out the CALLING repository, not azure-workflows. That is why the
+      # composite actions below are referenced by full path rather than "./".
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          # Full history: SonarCloud needs blame data to attribute New Code.
+          fetch-depth: 0
+
+      - name: Set up Python and Poetry
+        uses: rubensgomes-org/azure-workflows/.github/actions/setup-python-poetry@v0
+
+      - name: Install tools and dependencies
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Install tools and dependencies"
+          echo "=============================================================="
+          poetry --no-cache -v install
+
+      - name: Poetry static analysis and test coverage
+        uses: rubensgomes-org/azure-workflows/.github/actions/poetry-build@v0
+
+      # Skipped unless the caller opts in with run-sonar: true. A skipped step
+      # here is the expected outcome, not a misconfiguration.
+      - name: sonar
+        if: ${{ inputs.run-sonar }}
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: sonar"
+          echo "=============================================================="
+          if [ -z "${SONAR_TOKEN:-}" ]; then
+            echo "run-sonar was set to true but no sonar-token secret was" >&2
+            echo "supplied. Map it in the caller's 'secrets:' block, or drop" \
+              >&2
+            echo "run-sonar from the caller to fall back to the default." >&2
+            exit 1
+          fi
+
+      - name: SonarCloud scan
+        if: ${{ inputs.run-sonar }}
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}

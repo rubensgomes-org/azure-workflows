@@ -9,18 +9,19 @@ Callers map secrets **explicitly**. `secrets: inherit` only forwards secrets
 whose names match exactly, so it would not map `RUBENS_PAT_TOKEN` onto the
 declared `packages-token`.
 
-| Declared name         | Typically mapped from | Required by                                                 | Notes                                                                        |
-|-----------------------|-----------------------|-------------------------------------------------------------|------------------------------------------------------------------------------|
-| `packages-token`      | `RUBENS_PAT_TOKEN`    | `gradle-build-verify`, `gradle-release`, `acr-build-deploy` | classic PAT, `read:packages`. `gradle-release` also needs `repo` — it pushes |
-| `sonar-token`         | `SONAR_TOKEN`         | `gradle-build-verify` (only when `run-sonar: true`)         | must be able to **read quality gate status**, not just submit analyses       |
-| `azure-client-secret` | `AZURE_CLIENT_SECRET` | `acr-build-deploy`, `acr-repo-delete`                       | service principal client secret                                              |
+| Declared name         | Typically mapped from | Required by                                                                | Notes                                                                        |
+|-----------------------|-----------------------|----------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| `packages-token`      | `RUBENS_PAT_TOKEN`    | `gradle-build-verify`, `gradle-release`, `acr-build-deploy`                | classic PAT, `read:packages`. `gradle-release` also needs `repo` — it pushes |
+| `sonar-token`         | `SONAR_TOKEN`         | `gradle-build-verify`, `poetry-build-verify` (only when `run-sonar: true`) | must be able to **read quality gate status**, not just submit analyses       |
+| `azure-client-secret` | `AZURE_CLIENT_SECRET` | `acr-build-deploy`, `acr-repo-delete`                                      | service principal client secret                                              |
 
 Every one of these is declared `required: true` except `sonar-token`, and an
 unset secret arrives as the **empty string** rather than as an error. That is
 why the consumers of these values check for emptiness themselves: `azure-login`
 validates all four Azure values in one pass so a single run reports every
-missing one, and the `sonar` step in `gradle-build-verify.yml` fails outright if
-`run-sonar` was set to `true` without a token.
+missing one, and the `sonar` step in `gradle-build-verify.yml` and
+`poetry-build-verify.yml` fails outright if `run-sonar` was set to `true`
+without a token.
 
 ## Action Variables
 
@@ -36,7 +37,7 @@ leaves them readable in the log of a failed sign-in instead of masked as `***`.
 
 ## Consumer stubs
 
-### build-verify
+### gradle-build-verify
 
 ```yaml
 name: build-verify
@@ -64,7 +65,29 @@ SpotBugs needs no input here. The consumer build applies the
 `check` lifecycle task, so it runs inside the build step and a finding fails the
 job.
 
-### release
+### poetry-build-verify
+
+```yaml
+name: build-verify
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build-verify:
+    uses: rubensgomes-org/azure-workflows/.github/workflows/poetry-build-verify.yml@v0
+    # The SonarCloud quality gate is opt-in. Drop this "with:" block to build
+    # and verify without it; the sonar step then shows as skipped.
+    with:
+      run-sonar: true
+    secrets:
+      sonar-token: ${{ secrets.SONAR_TOKEN }}
+```
+
+### gradle-release
 
 ```yaml
 name: release

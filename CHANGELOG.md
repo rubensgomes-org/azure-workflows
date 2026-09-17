@@ -24,7 +24,17 @@ the GitHub Release notes.
 
 ### Added
 
+- New `poetry-build-verify` reusable workflow for Python/Poetry projects:
+  runs the static type checker, static code analysis, and unit test
+  coverage, with an opt-in SonarCloud quality gate.
+- New `setup-python-poetry` and `poetry-build` composite actions, used by
+  `poetry-build-verify`.
+
 ### Changed
+
+- **Breaking:** `confirm` on `acr-repo-delete` is now a string that must
+  exactly match `DELETE REPO <registry-name> <environment>/<artifactId>`,
+  replacing the boolean confirmation checkbox.
 
 ### Fixed
 

@@ -1,0 +1,36 @@
+# =============================================================================
+# setup-python-poetry
+#
+# Installs the pinned Python and configures Poetry. Nothing else: no
+# checkout, no build.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: setup-python-poetry
+description: 'Installs the pinned Python and configures Poetry.'
+
+inputs:
+  python-version:
+    description: 'Python version to install.'
+    required: false
+    default: '3.14'
+  poetry-version:
+    description: 'Poetry version to install.'
+    required: false
+    default: '2.4.3'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Set up Poetry
+      uses: Gr1N/setup-poetry@v8
+      with:
+        poetry-version: ${{ inputs.poetry-version }}
