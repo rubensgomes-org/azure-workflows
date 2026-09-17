@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.10] - 2026-09-17
+
+### Added
+
+### Changed
+
 - **Breaking:** removed the `confirm` input from `acr-repo-delete`. The
   `allowed-actor` safeguard is now the only gate before deletion.
 
