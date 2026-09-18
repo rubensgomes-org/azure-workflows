@@ -24,6 +24,14 @@ the GitHub Release notes.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.0.11] - 2026-09-18
+
+### Added
+
 - New `publish-acr-image` composite action: sign in, verify the registry,
   build/push, verify, smoke-test, and purge an image in an existing ACR.
   Extracted from `acr-build-deploy.yml` so it can be shared by
