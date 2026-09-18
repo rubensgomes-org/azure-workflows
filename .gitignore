@@ -113,3 +113,6 @@ credentials.json
 
 # SonarLint local files (if using IDE plugins)
 .sonarlint/
+
+# do not add these files to git repo
+TODO.md

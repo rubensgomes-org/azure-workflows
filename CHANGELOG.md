@@ -24,7 +24,21 @@ the GitHub Release notes.
 
 ### Added
 
+- New `publish-acr-image` composite action: sign in, verify the registry,
+  build/push, verify, smoke-test, and purge an image in an existing ACR.
+  Extracted from `acr-build-deploy.yml` so it can be shared by
+  language-specific reusable workflows.
+- New `acr-build-deploy-python.yml` reusable workflow for Python/Poetry
+  projects, built on `setup-python-poetry`, `poetry-build`, and
+  `publish-acr-image`.
+
 ### Changed
+
+- **Breaking:** `acr-build-deploy.yml` is renamed to
+  `acr-build-deploy-java.yml`. Consumers must update their `uses:` path.
+- **Breaking:** `acr-build-deploy-java.yml` (formerly `acr-build-deploy.yml`)
+  now requires an `artifact-id` input instead of reading `artifactId` from
+  `app/gradle.properties`.
 
 ### Fixed
 

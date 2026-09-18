@@ -1,0 +1,233 @@
+# =============================================================================
+# publish-acr-image
+#
+# Signs in to Azure, verifies an EXISTING Azure Container Registry, builds and
+# pushes a container image to it with "az acr build" (server-side in ACR
+# Tasks: no local Docker, no docker login, no separate push), verifies the
+# push landed, smoke-tests the image, and purges the untagged manifests it
+# orphaned.
+#
+# Language-agnostic: the caller resolves the application version (from a
+# Gradle .env, `poetry version -s`, or any other source) and passes it in via
+# the app-version input.
+#
+# This action never CREATES a registry. Provisioning lives in
+# rubensgomes-org/azure-iac.
+#
+# Callers MUST run actions/checkout first.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: publish-acr-image
+description: >-
+  Builds, pushes, verifies, smoke-tests, and purges a container image in an
+  existing Azure Container Registry.
+
+inputs:
+  azure-client-id:
+    description: 'Service principal application (client) ID.'
+    required: true
+  azure-client-secret:
+    description: 'Service principal client secret.'
+    required: true
+  azure-tenant-id:
+    description: 'Entra ID tenant ID.'
+    required: true
+  azure-subscription-id:
+    description: 'Subscription holding the registry.'
+    required: true
+  registry-name:
+    description: >-
+      Name of the EXISTING Azure Container Registry to push to (not the
+      login server).
+    required: true
+  artifact-id:
+    description: 'Artifact ID used as the image repository name.'
+    required: true
+  environment:
+    description: >-
+      Image namespace, used as <environment>/<artifact-id>:<tag>.
+    required: true
+  tag:
+    description: >-
+      Image tag. Empty defaults to app-version.
+    required: false
+    default: ''
+  app-version:
+    description: >-
+      Application version, resolved by the caller. Used as the tag when the
+      tag input is empty, and passed to the image build as APP_VERSION.
+    required: true
+  docker-context:
+    description: 'Build context passed to "az acr build".'
+    required: false
+    default: '.'
+  smoke-entrypoint:
+    description: >-
+      Container ENTRYPOINT override for the smoke test. Empty runs the
+      image's default ENTRYPOINT.
+    required: false
+    default: ''
+  smoke-args:
+    description: 'Arguments passed to the smoke-test entrypoint.'
+    required: false
+    default: '--version'
+
+outputs:
+  image:
+    description: 'Published image reference, as <environment>/<artifact-id>:<tag>.'
+    value: ${{ steps.image.outputs.image }}
+
+runs:
+  using: composite
+  steps:
+    - name: Sign in to Azure
+      uses: rubensgomes-org/azure-workflows/.github/actions/azure-login@v0
+      with:
+        client-id: ${{ inputs.azure-client-id }}
+        client-secret: ${{ inputs.azure-client-secret }}
+        tenant-id: ${{ inputs.azure-tenant-id }}
+        subscription-id: ${{ inputs.azure-subscription-id }}
+
+    # Fail fast on a missing registry, BEFORE spending time on a build whose
+    # output could not be pushed anywhere.
+    - name: Verify the registry exists
+      id: registry
+      uses: rubensgomes-org/azure-workflows/.github/actions/verify-acr-registry@v0
+      with:
+        registry-name: ${{ inputs.registry-name }}
+
+    - name: Resolve the image coordinates
+      id: image
+      shell: bash
+      env:
+        ARTIFACT_ID: ${{ inputs.artifact-id }}
+        APP_VERSION: ${{ inputs.app-version }}
+        INPUT_TAG: ${{ inputs.tag }}
+        ENVIRONMENT: ${{ inputs.environment }}
+      run: |
+        echo "=============================================================="
+        echo " STEP: Resolve the image coordinates"
+        echo "=============================================================="
+        set -euo pipefail
+        if [ -z "${ENVIRONMENT:-}" ]; then
+          echo "The environment input resolved to empty." >&2
+          exit 1
+        fi
+        # An empty tag input means "use the application version".
+        tag="${INPUT_TAG:-$APP_VERSION}"
+        echo "image=${ENVIRONMENT}/${ARTIFACT_ID}:${tag}" >> "$GITHUB_OUTPUT"
+        echo "app_version=${APP_VERSION}"                 >> "$GITHUB_OUTPUT"
+        echo "Building ${ENVIRONMENT}/${ARTIFACT_ID}:${tag}" \
+             "(version ${APP_VERSION})"
+
+    - name: Build and push the image with az acr build
+      shell: bash
+      env:
+        ACR_NAME: ${{ inputs.registry-name }}
+        IMAGE: ${{ steps.image.outputs.image }}
+        APP_VERSION: ${{ steps.image.outputs.app_version }}
+        DOCKER_CONTEXT: ${{ inputs.docker-context }}
+      run: |
+        echo "=============================================================="
+        echo " STEP: Build and push the image with az acr build"
+        echo " az acr build --registry ${ACR_NAME} --image ${IMAGE}"
+        echo "=============================================================="
+        set -euo pipefail
+        az acr build \
+          --registry "$ACR_NAME" \
+          --image "$IMAGE" \
+          --build-arg APP_VERSION="$APP_VERSION" \
+          "$DOCKER_CONTEXT"
+
+    - name: Verify the image exists in the registry
+      shell: bash
+      env:
+        ACR_NAME: ${{ inputs.registry-name }}
+        IMAGE: ${{ steps.image.outputs.image }}
+      run: |
+        echo "=============================================================="
+        echo " STEP: Verify the image exists in the registry"
+        echo " az acr repository show --name ${ACR_NAME} --image ${IMAGE}"
+        echo "=============================================================="
+        set -euo pipefail
+        if ! digest="$(az acr repository show --name "$ACR_NAME" \
+                         --image "$IMAGE" --query digest -o tsv)"; then
+          echo "Image '${IMAGE}' is not in registry '${ACR_NAME}'." >&2
+          echo "The build step reported success, so the push did not land." \
+            >&2
+          echo "" >&2
+          echo "Tags currently in ${IMAGE%%:*}:" >&2
+          az acr repository show-tags --name "$ACR_NAME" \
+            --repository "${IMAGE%%:*}" -o tsv >&2 \
+            || echo "  (repository does not exist)" >&2
+          exit 1
+        fi
+        echo "Present in ${ACR_NAME}. Digest: ${digest}"
+
+    # Runs the pushed image inside ACR, proving the layers are pullable and
+    # the entrypoint starts. "$Registry" is substituted by ACR Tasks, not by
+    # bash.
+    - name: Smoke-test the image with az acr run
+      shell: bash
+      env:
+        ACR_NAME: ${{ inputs.registry-name }}
+        IMAGE: ${{ steps.image.outputs.image }}
+        SMOKE_ENTRYPOINT: ${{ inputs.smoke-entrypoint }}
+        SMOKE_ARGS: ${{ inputs.smoke-args }}
+      run: |
+        echo "=============================================================="
+        echo " STEP: Smoke-test the image with az acr run"
+        echo "=============================================================="
+        set -euo pipefail
+        # An empty smoke-entrypoint runs the image's default ENTRYPOINT.
+        if [ -n "${SMOKE_ENTRYPOINT:-}" ]; then
+          smoke_cmd="--entrypoint ${SMOKE_ENTRYPOINT}"
+          smoke_cmd="${smoke_cmd} \$Registry/${IMAGE} ${SMOKE_ARGS}"
+        else
+          smoke_cmd="\$Registry/${IMAGE} ${SMOKE_ARGS}"
+        fi
+        echo " az acr run --registry ${ACR_NAME} --cmd \"${smoke_cmd}\""
+        az acr run \
+          --registry "$ACR_NAME" \
+          --cmd "$smoke_cmd" \
+          /dev/null
+
+    # Re-pushing a tag orphans the manifest it previously pointed at. Those
+    # untagged manifests still bill against the registry quota.
+    - name: Purge untagged images from the repository
+      shell: bash
+      env:
+        ACR_NAME: ${{ inputs.registry-name }}
+        IMAGE: ${{ steps.image.outputs.image }}
+      run: |
+        echo "=============================================================="
+        echo " STEP: Purge untagged images from the repository"
+        echo "=============================================================="
+        set -euo pipefail
+        repository="${IMAGE%%:*}"
+        # The TAG half of the filter is "^$" -- match the EMPTY tag, i.e.
+        # untagged manifests only. It is NOT a typo for "^.*$": a filter that
+        # matched every tag would delete the image just pushed.
+        purge_cmd="acr purge --filter '^${repository}$:^\$'"
+        purge_cmd="${purge_cmd} --ago 0d --untagged"
+        echo " az acr run --registry ${ACR_NAME} --cmd \"${purge_cmd}\""
+        az acr run \
+          --registry "$ACR_NAME" \
+          --cmd "$purge_cmd" \
+          /dev/null
+
+    - name: Report the published image
+      shell: bash
+      env:
+        IMAGE: ${{ steps.image.outputs.image }}
+        ACR_LOGIN_SERVER: ${{ steps.registry.outputs.login-server }}
+      run: |
+        echo "=============================================================="
+        echo " STEP: Report the published image"
+        echo "=============================================================="
+        echo "Published:"
+        echo "  ${ACR_LOGIN_SERVER}/${IMAGE}"

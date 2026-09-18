@@ -39,19 +39,24 @@ Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 
 ## GitHub Actions
 
-| Reusable workflow         | Purpose                                                                                |
-|---------------------------|----------------------------------------------------------------------------------------|
-| `gradle-build-verify.yml` | compile, test, check, assemble, then block on the SonarCloud quality gate              |
-| `gradle-release.yml`      | `./gradlew release` (net.researchgate.release). **Writes to the repository**           |
-| `acr-build-deploy.yml`    | build the app, `az acr build` into an existing ACR, verify, smoke-test, purge untagged |
-| `acr-repo-delete.yml`     | **destructive** — delete a repository and all its tags from an ACR                     |
+| Reusable workflow             | Purpose                                                                                     |
+|--------------------------------|----------------------------------------------------------------------------------------------|
+| `gradle-build-verify.yml`      | compile, test, check, assemble, then block on the SonarCloud quality gate                   |
+| `gradle-release.yml`           | `./gradlew release` (net.researchgate.release). **Writes to the repository**                |
+| `poetry-build-verify.yml`      | install, then mypy, pylint, pytest, then block on the SonarCloud quality gate               |
+| `acr-build-deploy-java.yml`    | build a Java/Gradle app, publish its image to an existing ACR, verify, smoke-test, purge    |
+| `acr-build-deploy-python.yml`  | build a Python/Poetry app, publish its image to an existing ACR, verify, smoke-test, purge  |
+| `acr-repo-delete.yml`          | **destructive** — delete a repository and all its tags from an ACR                          |
 
-| Composite action      | Purpose                                                    |
-|-----------------------|------------------------------------------------------------|
-| `setup-java-gradle`   | install the pinned JDK, configure Gradle                   |
-| `gradle-build`        | compile / test / check / assemble as four red-green steps  |
-| `azure-login`         | `az login` as a service principal, select the subscription |
-| `verify-acr-registry` | assert a registry exists, return its login server          |
+| Composite action       | Purpose                                                     |
+|--------------------------|---------------------------------------------------------------|
+| `setup-java-gradle`    | install the pinned JDK, configure Gradle                     |
+| `gradle-build`         | compile / test / check / assemble as four red-green steps    |
+| `setup-python-poetry`  | install the pinned Python, configure Poetry                  |
+| `poetry-build`         | mypy / pylint / pytest as three red-green steps               |
+| `azure-login`          | `az login` as a service principal, select the subscription   |
+| `verify-acr-registry`  | assert a registry exists, return its login server             |
+| `publish-acr-image`    | build, push, verify, smoke-test, and purge an image in an ACR |
 
 | Repository workflow | Purpose                                                                                                     |
 |---------------------|-------------------------------------------------------------------------------------------------------------|

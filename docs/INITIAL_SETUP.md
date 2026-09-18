@@ -9,11 +9,11 @@ Callers map secrets **explicitly**. `secrets: inherit` only forwards secrets
 whose names match exactly, so it would not map `RUBENS_PAT_TOKEN` onto the
 declared `packages-token`.
 
-| Declared name         | Typically mapped from | Required by                                                                | Notes                                                                        |
-|-----------------------|-----------------------|----------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| `packages-token`      | `RUBENS_PAT_TOKEN`    | `gradle-build-verify`, `gradle-release`, `acr-build-deploy`                | classic PAT, `read:packages`. `gradle-release` also needs `repo` — it pushes |
-| `sonar-token`         | `SONAR_TOKEN`         | `gradle-build-verify`, `poetry-build-verify` (only when `run-sonar: true`) | must be able to **read quality gate status**, not just submit analyses       |
-| `azure-client-secret` | `AZURE_CLIENT_SECRET` | `acr-build-deploy`, `acr-repo-delete`                                      | service principal client secret                                              |
+| Declared name         | Typically mapped from | Required by                                                                                    | Notes                                                                        |
+|-----------------------|-----------------------|--------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| `packages-token`      | `RUBENS_PAT_TOKEN`    | `gradle-build-verify`, `gradle-release`, `acr-build-deploy-java`                                 | classic PAT, `read:packages`. `gradle-release` also needs `repo` — it pushes |
+| `sonar-token`         | `SONAR_TOKEN`         | `gradle-build-verify`, `poetry-build-verify` (only when `run-sonar: true`)                       | must be able to **read quality gate status**, not just submit analyses       |
+| `azure-client-secret` | `AZURE_CLIENT_SECRET` | `acr-build-deploy-java`, `acr-build-deploy-python`, `acr-repo-delete`                            | service principal client secret                                              |
 
 Every one of these is declared `required: true` except `sonar-token`, and an
 unset secret arrives as the **empty string** rather than as an error. That is
@@ -25,11 +25,11 @@ without a token.
 
 ## Action Variables
 
-| Declared name           | Typically mapped from   | Required by                           | Notes                                                                          |
-|-------------------------|-------------------------|---------------------------------------|--------------------------------------------------------------------------------|
-| `azure-client-id`       | `AZURE_CLIENT_ID`       | `acr-build-deploy`, `acr-repo-delete` | service principal application (client) ID                                      |
-| `azure-tenant-id`       | `AZURE_TENANT_ID`       | `acr-build-deploy`, `acr-repo-delete` | Entra ID tenant the principal belongs to                                       |
-| `azure-subscription-id` | `AZURE_SUBSCRIPTION_ID` | `acr-build-deploy`, `acr-repo-delete` | subscription holding the registry — four separate values, not one `creds` JSON |
+| Declared name           | Typically mapped from   | Required by                                                            | Notes                                                                          |
+|-------------------------|-------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| `azure-client-id`       | `AZURE_CLIENT_ID`       | `acr-build-deploy-java`, `acr-build-deploy-python`, `acr-repo-delete` | service principal application (client) ID                                      |
+| `azure-tenant-id`       | `AZURE_TENANT_ID`       | `acr-build-deploy-java`, `acr-build-deploy-python`, `acr-repo-delete` | Entra ID tenant the principal belongs to                                       |
+| `azure-subscription-id` | `AZURE_SUBSCRIPTION_ID` | `acr-build-deploy-java`, `acr-build-deploy-python`, `acr-repo-delete` | subscription holding the registry — four separate values, not one `creds` JSON |
 
 Callers pass these under `with:`, not `secrets:`. They identify the principal
 but grant nothing without `azure-client-secret`, so keeping them variables
@@ -105,10 +105,10 @@ jobs:
       packages-token: ${{ secrets.RUBENS_PAT_TOKEN }}
 ```
 
-### acr-build-deploy
+### acr-build-deploy-java
 
 ```yaml
-name: acr-build-deploy
+name: acr-build-deploy-java
 on:
   workflow_dispatch:
     inputs:
@@ -120,8 +120,7 @@ on:
         type: string
       tag:
         description: >-
-          Image tag. Empty defaults to the application version (APP_VERSION in
-          .env).
+          Image tag. Empty defaults to the application version.
         required: false
         type: string
       registry_name:
@@ -129,26 +128,79 @@ on:
           Name of the EXISTING Azure Container Registry to push to (not the
           login server).
         required: false
-        #default: crrgomesdev01
         default: crrgomesdev01
+        type: string
+      artifact_id:
+        description: 'Artifact ID used as the image repository name.'
+        required: true
         type: string
 permissions:
   contents: read
 concurrency:
-  group: acr-build-deploy
+  group: acr-build-deploy-java
   cancel-in-progress: false
 jobs:
   build:
-    uses: rubensgomes-org/azure-workflows/.github/workflows/acr-build-deploy.yml@v0
+    uses: rubensgomes-org/azure-workflows/.github/workflows/acr-build-deploy-java.yml@v0
     with:
       environment: ${{ inputs.environment }}
       tag: ${{ inputs.tag }}
       registry-name: ${{ inputs.registry_name }}
+      artifact-id: ${{ inputs.artifact_id }}
       azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
       azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
       azure-subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
     secrets:
       packages-token: ${{ secrets.RUBENS_PAT_TOKEN }}
+      azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+```
+
+### acr-build-deploy-python
+
+```yaml
+name: acr-build-deploy-python
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: >-
+          Image namespace, used as <environment>/<artifactId>:<tag>.
+        required: false
+        default: lab
+        type: string
+      tag:
+        description: >-
+          Image tag. Empty defaults to the application version.
+        required: false
+        type: string
+      registry_name:
+        description: >-
+          Name of the EXISTING Azure Container Registry to push to (not the
+          login server).
+        required: false
+        default: crrgomesdev01
+        type: string
+      artifact_id:
+        description: 'Artifact ID used as the image repository name.'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: acr-build-deploy-python
+  cancel-in-progress: false
+jobs:
+  build:
+    uses: rubensgomes-org/azure-workflows/.github/workflows/acr-build-deploy-python.yml@v0
+    with:
+      environment: ${{ inputs.environment }}
+      tag: ${{ inputs.tag }}
+      registry-name: ${{ inputs.registry_name }}
+      artifact-id: ${{ inputs.artifact_id }}
+      azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    secrets:
       azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 ```
 
@@ -200,7 +252,6 @@ Consumer projects must match the layout of
 |---------------------------------------------------------------|-------------------------------------|
 | Gradle subproject is `:app`                                   | fixed, not an input                 |
 | Toolchain is Microsoft JDK 25                                 | `java-version`, `java-distribution` |
-| `artifactId` is in `app/gradle.properties`                    | fixed, not an input                 |
 | `developerName` / `developerEmail` are in `gradle.properties` | `properties-file`                   |
 
 ---

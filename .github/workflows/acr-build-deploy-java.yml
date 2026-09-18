@@ -1,0 +1,143 @@
+# =============================================================================
+# acr-build-deploy-java
+#
+# Reusable workflow: build a Java/Gradle application, then publish its
+# container image to an EXISTING Azure Container Registry via the
+# publish-acr-image composite action.
+#
+# This workflow never CREATES a registry. Provisioning lives in
+# rubensgomes-org/azure-iac.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: acr-build-deploy-java
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: >-
+          Image namespace, used as <environment>/<artifactId>:<tag>.
+        required: true
+        type: string
+      tag:
+        description: >-
+          Image tag. Empty defaults to the application version.
+        required: false
+        default: ''
+        type: string
+      registry-name:
+        description: >-
+          Name of the EXISTING Azure Container Registry to push to (not the
+          login server).
+        required: true
+        type: string
+      artifact-id:
+        description: 'Artifact ID used as the image repository name.'
+        required: true
+        type: string
+      java-version:
+        description: >-
+          Java language version. Must match the consumer build toolchain pin.
+        required: false
+        default: '25'
+        type: string
+      java-distribution:
+        description: >-
+          JDK distribution. Must match the consumer build toolchain vendor pin.
+        required: false
+        default: microsoft
+        type: string
+      timeout-minutes:
+        description: 'Job timeout in minutes.'
+        required: false
+        default: 45
+        type: number
+      azure-client-id:
+        description: 'Service principal application (client) ID.'
+        required: true
+        type: string
+      azure-tenant-id:
+        description: 'Entra ID tenant ID.'
+        required: true
+        type: string
+      azure-subscription-id:
+        description: 'Subscription holding the registry.'
+        required: true
+        type: string
+
+    secrets:
+      packages-token:
+        description: >-
+          GitHub Packages token, exported to the build as GITHUB_TOKEN.
+        required: true
+      azure-client-secret:
+        description: 'Service principal client secret.'
+        required: true
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+
+    env:
+      PACKAGES_USER: ${{ github.actor }}
+      PACKAGES_TOKEN: ${{ secrets.packages-token }}
+      # Not an input: fixed across every consumer.
+      DOTENV_PATH: .env
+
+    steps:
+      # Checks out the CALLING repository, not azure-workflows.
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java and Gradle
+        uses: rubensgomes-org/azure-workflows/.github/actions/setup-java-gradle@v0
+        with:
+          java-version: ${{ inputs.java-version }}
+          java-distribution: ${{ inputs.java-distribution }}
+
+      - name: Build
+        uses: rubensgomes-org/azure-workflows/.github/actions/gradle-build@v0
+        with:
+          packages-user: ${{ env.PACKAGES_USER }}
+          packages-token: ${{ env.PACKAGES_TOKEN }}
+
+      # Must run AFTER the build: APP_VERSION is written by generateDotEnv,
+      # which hangs off "tasks.build".
+      - name: Resolve the application version
+        id: version
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Resolve the application version"
+          echo "=============================================================="
+          set -euo pipefail
+          app_version="$(sed -n 's/^APP_VERSION=//p' "$DOTENV_PATH" \
+                           2>/dev/null || true)"
+          if [ -z "$app_version" ]; then
+            echo "APP_VERSION not found in ${DOTENV_PATH}." >&2
+            echo "It is written by the Gradle build, so this means the" >&2
+            echo "build step did not run or did not reach generateDotEnv." >&2
+            exit 1
+          fi
+          echo "app_version=${app_version}" >> "$GITHUB_OUTPUT"
+          echo "Application version: ${app_version}"
+
+      - name: Publish the image to ACR
+        uses: rubensgomes-org/azure-workflows/.github/actions/publish-acr-image@v0
+        with:
+          azure-client-id: ${{ inputs.azure-client-id }}
+          azure-client-secret: ${{ secrets.azure-client-secret }}
+          azure-tenant-id: ${{ inputs.azure-tenant-id }}
+          azure-subscription-id: ${{ inputs.azure-subscription-id }}
+          registry-name: ${{ inputs.registry-name }}
+          artifact-id: ${{ inputs.artifact-id }}
+          environment: ${{ inputs.environment }}
+          tag: ${{ inputs.tag }}
+          app-version: ${{ steps.version.outputs.app_version }}
+          smoke-entrypoint: java
