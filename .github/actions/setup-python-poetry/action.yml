@@ -33,4 +33,4 @@ runs:
     - name: Install Poetry
       uses: snok/install-poetry@v1
       with:
-        poetry-version: ${{ inputs.poetry-version }}
+        version: ${{ inputs.poetry-version }}
