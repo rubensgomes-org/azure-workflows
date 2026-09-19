@@ -28,6 +28,14 @@ the GitHub Release notes.
 
 ### Fixed
 
+## [0.0.13] - 2026-09-19
+
+### Added
+
+### Changed
+
+### Fixed
+
 - `setup-python-poetry` now passes `version` instead of `poetry-version` to
   `snok/install-poetry@v1`, matching that action's actual input name.
 
