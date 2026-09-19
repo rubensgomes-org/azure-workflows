@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.12] - 2026-09-19
+
+### Added
+
+### Changed
+
 - `setup-python-poetry` now installs Poetry via `snok/install-poetry@v1`
   instead of the unmaintained `Gr1N/setup-poetry@v8`.
 - Documented in `DEVELOPMENT_WORKFLOW.md` that `release.yml` force-moves the
