@@ -30,7 +30,7 @@ runs:
       with:
         python-version: ${{ inputs.python-version }}
 
-    - name: Set up Poetry
-      uses: Gr1N/setup-poetry@v8
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
       with:
         poetry-version: ${{ inputs.poetry-version }}

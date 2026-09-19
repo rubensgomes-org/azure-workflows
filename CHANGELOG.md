@@ -26,6 +26,11 @@ the GitHub Release notes.
 
 ### Changed
 
+- `setup-python-poetry` now installs Poetry via `snok/install-poetry@v1`
+  instead of the unmaintained `Gr1N/setup-poetry@v8`.
+- Documented in `DEVELOPMENT_WORKFLOW.md` that `release.yml` force-moves the
+  major tag, requiring `git fetch --tags --force` to sync it locally.
+
 ### Fixed
 
 ## [0.0.11] - 2026-09-18

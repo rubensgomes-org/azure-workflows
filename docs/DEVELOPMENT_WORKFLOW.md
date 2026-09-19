@@ -116,5 +116,9 @@ Follow the steps below to cut a release.
 - Run `make help` for the full list of targets, including `release-tag`, which
   tags the changelog's top version without bumping.
 
+- `release.yml` force-moves the major tag (for example `v0`) on origin. A
+  plain `git fetch` does not update a local tag that was force-moved; run
+  `git fetch --tags --force` to bring your local major tag in sync.
+
 ---
 Author:  [Rubens Gomes](https://rubensgomes.com/)
