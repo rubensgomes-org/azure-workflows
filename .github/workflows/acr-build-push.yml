@@ -1,0 +1,91 @@
+# =============================================================================
+# acr-build-push
+#
+# Reusable workflow: publish a container image to an EXISTING Azure
+# Container Registry via the publish-acr-image composite action.
+#
+# Language-agnostic: the caller resolves the application version and passes
+# it in via the app-version input. This workflow never CREATES a registry.
+# Provisioning lives in rubensgomes-org/azure-iac.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: acr-build-push
+
+on:
+  workflow_call:
+    inputs:
+      app-version:
+        description: 'Application version, resolved by the caller.'
+        required: true
+        type: string
+      environment:
+        description: >-
+          Image namespace, used as <environment>/<artifactId>:<tag>.
+        required: true
+        type: string
+      tag:
+        description: >-
+          Image tag. Empty defaults to the application version.
+        required: false
+        default: ''
+        type: string
+      registry-name:
+        description: >-
+          Name of the EXISTING Azure Container Registry to push to (not the
+          login server).
+        required: true
+        type: string
+      artifact-id:
+        description: 'Artifact ID used as the image repository name.'
+        required: true
+        type: string
+      timeout-minutes:
+        description: 'Job timeout in minutes.'
+        required: false
+        default: 45
+        type: number
+      azure-client-id:
+        description: 'Service principal application (client) ID.'
+        required: true
+        type: string
+      azure-tenant-id:
+        description: 'Entra ID tenant ID.'
+        required: true
+        type: string
+      azure-subscription-id:
+        description: 'Subscription holding the registry.'
+        required: true
+        type: string
+
+    secrets:
+      azure-client-secret:
+        description: 'Service principal client secret.'
+        required: true
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+
+    steps:
+      # Checks out the CALLING repository, not azure-workflows.
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Publish the image to ACR
+        uses: rubensgomes-org/azure-workflows/.github/actions/publish-acr-image@v0
+        with:
+          azure-client-id: ${{ inputs.azure-client-id }}
+          azure-client-secret: ${{ secrets.azure-client-secret }}
+          azure-tenant-id: ${{ inputs.azure-tenant-id }}
+          azure-subscription-id: ${{ inputs.azure-subscription-id }}
+          registry-name: ${{ inputs.registry-name }}
+          artifact-id: ${{ inputs.artifact-id }}
+          environment: ${{ inputs.environment }}
+          tag: ${{ inputs.tag }}
+          app-version: ${{ inputs.app-version }}

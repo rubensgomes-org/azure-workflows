@@ -46,6 +46,7 @@ Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 | `poetry-build-verify.yml`      | install, then mypy, pylint, pytest, then block on the SonarCloud quality gate               |
 | `acr-build-push-java.yml`      | build a Java/Gradle app, publish its image to an existing ACR, verify, smoke-test, purge    |
 | `acr-build-push-python.yml`    | build a Python/Poetry app, publish its image to an existing ACR, verify, smoke-test, purge  |
+| `acr-build-push.yml`           | language-agnostic — publish a prebuilt app's image to an existing ACR, verify, smoke-test, purge |
 | `acr-repo-delete.yml`          | **destructive** — delete a repository and all its tags from an ACR                          |
 
 | Composite action       | Purpose                                                     |
