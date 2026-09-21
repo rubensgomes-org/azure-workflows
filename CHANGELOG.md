@@ -26,6 +26,11 @@ the GitHub Release notes.
 
 ### Changed
 
+- **Breaking:** `acr-build-deploy-java.yml` is renamed to
+  `acr-build-push-java.yml`. Consumers must update their `uses:` path.
+- **Breaking:** `acr-build-deploy-python.yml` is renamed to
+  `acr-build-push-python.yml`. Consumers must update their `uses:` path.
+
 ### Fixed
 
 ## [0.0.13] - 2026-09-19
