@@ -24,6 +24,14 @@ the GitHub Release notes.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.0.15] - 2026-09-20
+
+### Added
+
 - New `acr-build-push.yml` reusable workflow: language-agnostic, publishes a
   prebuilt app's image to an existing ACR via `publish-acr-image`. Takes
   `app-version` as a required input instead of resolving it from a build.
