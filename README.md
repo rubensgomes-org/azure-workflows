@@ -44,8 +44,8 @@ Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 | `gradle-build-verify.yml`      | compile, test, check, assemble, then block on the SonarCloud quality gate                   |
 | `gradle-release.yml`           | `./gradlew release` (net.researchgate.release). **Writes to the repository**                |
 | `poetry-build-verify.yml`      | install, then mypy, pylint, pytest, then block on the SonarCloud quality gate               |
-| `acr-build-deploy-java.yml`    | build a Java/Gradle app, publish its image to an existing ACR, verify, smoke-test, purge    |
-| `acr-build-deploy-python.yml`  | build a Python/Poetry app, publish its image to an existing ACR, verify, smoke-test, purge  |
+| `acr-build-push-java.yml`      | build a Java/Gradle app, publish its image to an existing ACR, verify, smoke-test, purge    |
+| `acr-build-push-python.yml`    | build a Python/Poetry app, publish its image to an existing ACR, verify, smoke-test, purge  |
 | `acr-repo-delete.yml`          | **destructive** — delete a repository and all its tags from an ACR                          |
 
 | Composite action       | Purpose                                                     |
