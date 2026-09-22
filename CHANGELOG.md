@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.16] - 2026-09-22
+
+### Added
+
+### Changed
+
 - updates to documentation
 
 ### Fixed
