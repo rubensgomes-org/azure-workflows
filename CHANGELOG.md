@@ -26,6 +26,8 @@ the GitHub Release notes.
 
 ### Changed
 
+- updates to documentation
+
 ### Fixed
 
 ## [0.0.15] - 2026-09-20
