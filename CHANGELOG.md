@@ -24,6 +24,14 @@ the GitHub Release notes.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.0.18] - 2026-09-22
+
+### Added
+
 - `.github/dependabot.yml`: daily GitHub Actions version updates for
   workflows and composite actions.
 
