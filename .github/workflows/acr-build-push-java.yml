@@ -13,7 +13,7 @@
 # refer to the `AI_DISCLAIMER.md` document located in the project's root
 # directory.
 # =============================================================================
-name: acr-build-push-java
+name: acr-build-push-java (reusable)
 
 on:
   workflow_call:

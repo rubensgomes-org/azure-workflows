@@ -19,7 +19,7 @@
 # refer to the `AI_DISCLAIMER.md` document located in the project's root
 # directory.
 # =============================================================================
-name: gradle-build-verify
+name: gradle-build-verify (reusable)
 
 on:
   workflow_call:

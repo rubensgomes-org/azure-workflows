@@ -26,6 +26,8 @@ the GitHub Release notes.
 
 ### Changed
 
+- Reusable workflows: appended "(reusable)" to each workflow `name`.
+
 ### Fixed
 
 ## [0.0.18] - 2026-09-22

@@ -16,7 +16,7 @@
 # refer to the `AI_DISCLAIMER.md` document located in the project's root
 # directory.
 # =============================================================================
-name: gradle-release
+name: gradle-release (reusable)
 
 on:
   workflow_call:

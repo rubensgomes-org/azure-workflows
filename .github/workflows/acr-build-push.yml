@@ -13,7 +13,7 @@
 # refer to the `AI_DISCLAIMER.md` document located in the project's root
 # directory.
 # =============================================================================
-name: acr-build-push
+name: acr-build-push (reusable)
 
 on:
   workflow_call:

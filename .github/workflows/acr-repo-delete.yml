@@ -24,7 +24,7 @@
 # refer to the `AI_DISCLAIMER.md` document located in the project's root
 # directory.
 # =============================================================================
-name: acr-repo-delete
+name: acr-repo-delete (reusable)
 
 on:
   workflow_call:
