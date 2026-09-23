@@ -24,6 +24,14 @@ the GitHub Release notes.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.0.17] - 2026-09-22
+
+### Added
+
 - `poetry-build`: `pip-audit --skip-editable` dependency vulnerability scan
   step, before unit tests. Callers must add `pip-audit` to their Poetry dev
   dependencies.
