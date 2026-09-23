@@ -2,8 +2,9 @@
 # poetry-build-verify
 #
 # Reusable workflow: install dependencies, then run the static type checker,
-# static code analysis, and unit test coverage. The SonarCloud quality gate
-# is OPT-IN -- pass run-sonar: true to enable it.
+# static code analysis, a dependency vulnerability scan (pip-audit), and unit
+# test coverage. The SonarCloud quality gate is OPT-IN -- pass
+# run-sonar: true to enable it.
 #
 # Reused by Rubens Gomes Python repository projects. Callers keep a thin
 # workflow_dispatch stub that owns the "Run workflow" button, the permissions

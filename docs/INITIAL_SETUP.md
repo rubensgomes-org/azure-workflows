@@ -67,6 +67,9 @@ job.
 
 ### poetry-build-verify
 
+The caller must list `pip-audit` in its Poetry dev dependencies
+(`poetry add --group dev pip-audit`).
+
 ```yaml
 name: build-verify
 on:

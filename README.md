@@ -43,7 +43,7 @@ Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 |--------------------------------|----------------------------------------------------------------------------------------------|
 | `gradle-build-verify.yml`      | compile, test, check, assemble, then block on the SonarCloud quality gate                   |
 | `gradle-release.yml`           | `./gradlew release` (net.researchgate.release). **Writes to the repository**                |
-| `poetry-build-verify.yml`      | install, then mypy, pylint, pytest, then block on the SonarCloud quality gate               |
+| `poetry-build-verify.yml`      | install, then mypy, pylint, pip-audit, pytest, then block on the SonarCloud quality gate    |
 | `acr-build-push-java.yml`      | build a Java/Gradle app, publish its image to an existing ACR, verify, smoke-test, purge    |
 | `acr-build-push-python.yml`    | build a Python/Poetry app, publish its image to an existing ACR, verify, smoke-test, purge  |
 | `acr-build-push.yml`           | language-agnostic — publish a prebuilt app's image to an existing ACR, verify, smoke-test, purge |
@@ -54,7 +54,7 @@ Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 | `setup-java-gradle`    | install the pinned JDK, configure Gradle                     |
 | `gradle-build`         | compile / test / check / assemble as four red-green steps    |
 | `setup-python-poetry`  | install the pinned Python, configure Poetry                  |
-| `poetry-build`         | mypy / pylint / pytest as three red-green steps               |
+| `poetry-build`         | mypy / pylint / pip-audit / pytest as four red-green steps    |
 | `azure-login`          | `az login` as a service principal, select the subscription   |
 | `verify-acr-registry`  | assert a registry exists, return its login server             |
 | `publish-acr-image`    | build, push, verify, smoke-test, and purge an image in an ACR |

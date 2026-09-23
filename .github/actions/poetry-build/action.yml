@@ -1,8 +1,9 @@
 # =============================================================================
 # poetry-build
 #
-# Runs the static type checker, static code analysis, and unit test coverage
-# as three independently red/green steps.
+# Runs the static type checker, static code analysis, a dependency
+# vulnerability scan, and unit test coverage as four independently red/green
+# steps. Callers MUST list `pip-audit` in their Poetry dev dependencies.
 #
 # Callers MUST run actions/checkout and the setup-python-poetry action first:
 # this action only invokes `poetry run ...`, it installs nothing.
@@ -14,7 +15,8 @@
 # =============================================================================
 name: poetry-build
 description: >-
-  Runs the static type checker, static code analysis, and unit test coverage.
+  Runs the static type checker, static code analysis, a dependency
+  vulnerability scan, and unit test coverage.
 
 runs:
   using: composite
@@ -34,6 +36,15 @@ runs:
         echo " STEP: Static code analysis"
         echo "=============================================================="
         poetry run pylint src/ tests/
+
+    # --strict is not used: it fails on the skipped editable project itself.
+    - name: Dependency vulnerability scan
+      shell: bash
+      run: |
+        echo "=============================================================="
+        echo " STEP: Dependency vulnerability scan"
+        echo "=============================================================="
+        poetry run pip-audit --skip-editable
 
     - name: Unit test coverage
       shell: bash
