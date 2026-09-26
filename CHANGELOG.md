@@ -26,6 +26,9 @@ the GitHub Release notes.
 
 ### Changed
 
+- `poetry-build-verify.yml`: bumped `SonarSource/sonarqube-scan-action` from
+  v5 to v8, removing the Node.js 20 deprecation warning from `actions/cache`.
+
 ### Fixed
 
 ## [0.0.19] - 2026-09-22
