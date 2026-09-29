@@ -1,4 +1,4 @@
-## Working on This Project
+## Development Workflow
 
 There are three primary workflows: making a modification, shipping a change and
 cutting a release. All work occurs directly on the `main` branch. This

@@ -24,7 +24,14 @@ the GitHub Release notes.
 
 ### Added
 
+- `LICENSE`: MIT License.
+- `README.md`: License section, and Links section with full URLs to the GitHub
+  project and the `docs` files.
+
 ### Changed
+
+- `README.md`: replaced the AI Assisted badge with GitHub Actions, Microsoft
+  Azure, AI Assisted, and License badges below the title.
 
 ### Fixed
 

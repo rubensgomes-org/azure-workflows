@@ -1,10 +1,15 @@
-[![AI Assisted](https://img.shields.io/badge/AI--Assisted-Development-007ACC?logo=openai&logoColor=white)](./AI_DISCLAIMER.md)
-
 # azure-workflows
+
+[![GitHub](https://img.shields.io/badge/GitHub-Actions-0969da?logo=github+actions)](https://github.com/features/actions)
+[![Microsoft](https://img.shields.io/badge/Microsoft-Azure-0969da)](https://azure.microsoft.com/en-us)
+[![AI Assisted](https://img.shields.io/badge/AI%20Assisted-Development-d29922)](https://github.com/rubensgomes-org/azure-workflows/blob/main/AI_DISCLAIMER.md)
+[![License](https://img.shields.io/badge/License-MIT-0969da)](https://github.com/rubensgomes-org/azure-workflows/blob/main/LICENSE)
 
 This project contains a collection of reusable GitHub Actions workflows and
 composite actions used across Azure Java and Spring Boot projects maintained by
 [Rubens Gomes](https://rubensgomes.com/).
+
+---
 
 ## AI Disclaimer
 
@@ -39,25 +44,25 @@ Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 
 ## GitHub Actions
 
-| Reusable workflow             | Purpose                                                                                     |
-|--------------------------------|----------------------------------------------------------------------------------------------|
-| `gradle-build-verify.yml`      | compile, test, check, assemble, then block on the SonarCloud quality gate                   |
-| `gradle-release.yml`           | `./gradlew release` (net.researchgate.release). **Writes to the repository**                |
-| `poetry-build-verify.yml`      | install, then mypy, pylint, pip-audit, pytest, then block on the SonarCloud quality gate    |
-| `acr-build-push-java.yml`      | build a Java/Gradle app, publish its image to an existing ACR, verify, smoke-test, purge    |
-| `acr-build-push-python.yml`    | build a Python/Poetry app, publish its image to an existing ACR, verify, smoke-test, purge  |
-| `acr-build-push.yml`           | language-agnostic — publish a prebuilt app's image to an existing ACR, verify, smoke-test, purge |
-| `acr-repo-delete.yml`          | **destructive** — delete a repository and all its tags from an ACR                          |
+| Reusable workflow           | Purpose                                                                                          |
+|-----------------------------|--------------------------------------------------------------------------------------------------|
+| `gradle-build-verify.yml`   | compile, test, check, assemble, then block on the SonarCloud quality gate                        |
+| `gradle-release.yml`        | `./gradlew release` (net.researchgate.release). **Writes to the repository**                     |
+| `poetry-build-verify.yml`   | install, then mypy, pylint, pip-audit, pytest, then block on the SonarCloud quality gate         |
+| `acr-build-push-java.yml`   | build a Java/Gradle app, publish its image to an existing ACR, verify, smoke-test, purge         |
+| `acr-build-push-python.yml` | build a Python/Poetry app, publish its image to an existing ACR, verify, smoke-test, purge       |
+| `acr-build-push.yml`        | language-agnostic — publish a prebuilt app's image to an existing ACR, verify, smoke-test, purge |
+| `acr-repo-delete.yml`       | **destructive** — delete a repository and all its tags from an ACR                               |
 
-| Composite action       | Purpose                                                     |
-|--------------------------|---------------------------------------------------------------|
-| `setup-java-gradle`    | install the pinned JDK, configure Gradle                     |
-| `gradle-build`         | compile / test / check / assemble as four red-green steps    |
-| `setup-python-poetry`  | install the pinned Python, configure Poetry                  |
-| `poetry-build`         | mypy / pylint / pip-audit / pytest as four red-green steps    |
-| `azure-login`          | `az login` as a service principal, select the subscription   |
-| `verify-acr-registry`  | assert a registry exists, return its login server             |
-| `publish-acr-image`    | build, push, verify, smoke-test, and purge an image in an ACR |
+| Composite action      | Purpose                                                       |
+|-----------------------|---------------------------------------------------------------|
+| `setup-java-gradle`   | install the pinned JDK, configure Gradle                      |
+| `gradle-build`        | compile / test / check / assemble as four red-green steps     |
+| `setup-python-poetry` | install the pinned Python, configure Poetry                   |
+| `poetry-build`        | mypy / pylint / pip-audit / pytest as four red-green steps    |
+| `azure-login`         | `az login` as a service principal, select the subscription    |
+| `verify-acr-registry` | assert a registry exists, return its login server             |
+| `publish-acr-image`   | build, push, verify, smoke-test, and purge an image in an ACR |
 
 | Repository workflow | Purpose                                                                                                     |
 |---------------------|-------------------------------------------------------------------------------------------------------------|
@@ -68,6 +73,17 @@ Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 
 See [DEVELOPMENT_WORKFLOW](./docs/DEVELOPMENT_WORKFLOW.md) for guidance on 
 developing, and cutting a release on this project.
+
+## License
+
+The project is licensed under
+[MIT License](https://github.com/rubensgomes-org/azure-workflows/blob/main/LICENSE).
+
+## Links
+
+- [GitHub Project](https://github.com/rubensgomes-org/azure-workflows)
+- [Development Workflow](https://github.com/rubensgomes-org/azure-workflows/blob/main/docs/DEVELOPMENT_WORKFLOW.md)
+- [Initial Setup](https://github.com/rubensgomes-org/azure-workflows/blob/main/docs/INITIAL_SETUP.md)
 
 ---
 Author:  [Rubens Gomes](https://rubensgomes.com/)
