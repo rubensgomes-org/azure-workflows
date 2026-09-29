@@ -24,6 +24,14 @@ the GitHub Release notes.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.0.21] - 2026-09-29
+
+### Added
+
 - `LICENSE`: MIT License.
 - `README.md`: License section, and Links section with full URLs to the GitHub
   project and the `docs` files.
