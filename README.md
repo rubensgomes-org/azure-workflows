@@ -6,7 +6,8 @@
 [![License](https://img.shields.io/badge/License-MIT-0969da)](https://github.com/rubensgomes-org/azure-workflows/blob/main/LICENSE)
 
 This project contains a collection of reusable GitHub Actions workflows and
-composite actions used across Azure Java and Spring Boot projects maintained by
+composite actions used across Python, Java/Spring Boot, and Microsoft Azure
+projects maintained by
 [Rubens Gomes](https://rubensgomes.com/).
 
 ---
@@ -49,6 +50,7 @@ Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 | `gradle-build-verify.yml`   | compile, test, check, assemble, then block on the SonarCloud quality gate                        |
 | `gradle-release.yml`        | `./gradlew release` (net.researchgate.release). **Writes to the repository**                     |
 | `poetry-build-verify.yml`   | install, then mypy, pylint, pip-audit, pytest, then block on the SonarCloud quality gate         |
+| `poetry-publish-pypi.yml`   | rename `[Unreleased]` in `CHANGELOG.md`, build, publish to PyPI. **Writes to the repository**    |
 | `acr-build-push-java.yml`   | build a Java/Gradle app, publish its image to an existing ACR, verify, smoke-test, purge         |
 | `acr-build-push-python.yml` | build a Python/Poetry app, publish its image to an existing ACR, verify, smoke-test, purge       |
 | `acr-build-push.yml`        | language-agnostic — publish a prebuilt app's image to an existing ACR, verify, smoke-test, purge |
@@ -71,7 +73,7 @@ Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 
 ## Development Workflow
 
-See [DEVELOPMENT_WORKFLOW](./docs/DEVELOPMENT_WORKFLOW.md) for guidance on 
+See [DEVELOPMENT_WORKFLOW](./docs/DEVELOPMENT_WORKFLOW.md) for guidance on
 developing, and cutting a release on this project.
 
 ## License

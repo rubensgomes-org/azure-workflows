@@ -19,7 +19,7 @@
 # refer to the `AI_DISCLAIMER.md` document located in the project's root
 # directory.
 # =============================================================================
-name: poetry-build-verify (reusable)
+name: Poetry Build and Verify (reusable)
 
 on:
   workflow_call:

@@ -24,6 +24,9 @@ the GitHub Release notes.
 
 ### Added
 
+- New `poetry-publish-pypi.yml` reusable workflow: renames `[Unreleased]`
+  in `CHANGELOG.md`, builds with Poetry, and publishes to PyPI.
+
 ### Changed
 
 ### Fixed
