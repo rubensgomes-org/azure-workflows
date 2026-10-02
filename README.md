@@ -1,9 +1,9 @@
-# azure-workflows
+# Reusable GitHub Workflows
 
 [![GitHub](https://img.shields.io/badge/GitHub-Actions-0969da?logo=github+actions)](https://github.com/features/actions)
 [![Microsoft](https://img.shields.io/badge/Microsoft-Azure-0969da)](https://azure.microsoft.com/en-us)
-[![AI Assisted](https://img.shields.io/badge/AI%20Assisted-Development-d29922)](https://github.com/rubensgomes-org/azure-workflows/blob/main/AI_DISCLAIMER.md)
-[![License](https://img.shields.io/badge/License-MIT-0969da)](https://github.com/rubensgomes-org/azure-workflows/blob/main/LICENSE)
+[![AI](https://img.shields.io/badge/AI-Assisted-d29922?logo=claude+code)](https://github.com/rubensgomes-org/azure-workflows/blob/main/AI_DISCLAIMER.md)
+[![license](https://img.shields.io/badge/license-MIT-1a7f37)](https://github.com/rubensgomes-org/azure-workflows/blob/main/LICENSE)
 
 This project contains a collection of reusable GitHub Actions workflows and
 composite actions used across Python, Java/Spring Boot, and Microsoft Azure
@@ -29,8 +29,8 @@ The following prerequisites are required:
 
 - Microsoft Azure account
 - An active Azure subscription
-- An Azure RBAC role that allows you to create the resources, such as resource
-  groups, container registry, container apps, and databases.
+- An Azure RBAC role that allows you to create resources such as resource
+  groups, container registries, container apps, and databases.
 - GitHub account
 - UNIX-based operating system (for example, AIX, Linux, macOS, or Solaris)
 - Azure CLI 2.90+
@@ -74,11 +74,11 @@ Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 ## Development Workflow
 
 See [DEVELOPMENT_WORKFLOW](./docs/DEVELOPMENT_WORKFLOW.md) for guidance on
-developing, and cutting a release on this project.
+developing and cutting a release for this project.
 
 ## License
 
-The project is licensed under
+This project is licensed under the
 [MIT License](https://github.com/rubensgomes-org/azure-workflows/blob/main/LICENSE).
 
 ## Links

@@ -11,8 +11,8 @@ renamed input, a changed default, a removed workflow.
 
 Add entries under `[Unreleased]` as you work. Cutting a release renames
 `[Unreleased]` to the new version and re-seeds an empty `[Unreleased]` block
-above it; see the "Cutting a Release" section in `README.md` for the full
-procedure.
+above it; see the "Cutting a Release" section in
+`docs/DEVELOPMENT_WORKFLOW.md` for the full procedure.
 
 `[Unreleased]` is for *changes since the last release only*.
 
@@ -25,6 +25,11 @@ the GitHub Release notes.
 ### Added
 
 ### Changed
+
+- `README.md`: retitled to "Reusable GitHub Workflows", restyled the AI and
+  License badges, and proofread.
+- `CHANGELOG.md`: "Cutting a Release" reference now points to
+  `docs/DEVELOPMENT_WORKFLOW.md`.
 
 ### Fixed
 
