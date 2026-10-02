@@ -41,7 +41,7 @@ The following prerequisites are required:
 
 ### Configuration
 
-Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
+Follow the steps in [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 
 ## GitHub Actions
 
@@ -68,7 +68,7 @@ Follow the steps in the [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 
 | Repository workflow | Purpose                                                                                                     |
 |---------------------|-------------------------------------------------------------------------------------------------------------|
-| `lint.yml`          | self-CI on push and pull request — `actionlint`, plus internal `uses:` refs agree                           |
+| `lint.yml`          | self-CI on push and pull request — `actionlint`, plus a check that internal `uses:` refs agree              |
 | `release.yml`       | fires on a `v*.*.*` tag push — validate tag against `CHANGELOG.md`, move the major tag, publish the release |
 
 ## Development Workflow
@@ -88,4 +88,4 @@ This project is licensed under the
 - [Initial Setup](https://github.com/rubensgomes-org/azure-workflows/blob/main/docs/INITIAL_SETUP.md)
 
 ---
-Author:  [Rubens Gomes](https://rubensgomes.com/)
+Author: [Rubens Gomes](https://rubensgomes.com/)
