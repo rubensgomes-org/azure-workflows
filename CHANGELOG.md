@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.23] - 2026-10-02
+
+### Added
+
+### Changed
+
 - `README.md`: retitled to "Reusable GitHub Workflows", restyled the AI and
   License badges, and proofread.
 - `CHANGELOG.md`: "Cutting a Release" reference now points to
