@@ -28,6 +28,14 @@ the GitHub Release notes.
 
 ### Fixed
 
+## [0.0.24] - 2026-10-02
+
+### Added
+
+### Changed
+
+### Fixed
+
 - Grammar in `AI_DISCLAIMER.md` and `README.md`.
 
 ## [0.0.23] - 2026-10-02
