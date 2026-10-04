@@ -76,6 +76,18 @@ Follow the steps in [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 See [DEVELOPMENT_WORKFLOW](./docs/DEVELOPMENT_WORKFLOW.md) for guidance on
 developing and cutting a release for this project.
 
+## Open Source Project Information
+
+This project is open source and publicly hosted on GitHub at
+[Math AI Agent](https://github.com/rubensgomes-org/). It is
+published under an
+[OSI-approved open-source license](https://opensource.org/licenses).
+
+> **Note:** Public availability and the use of an OSI-approved license are
+> requirements for eligibility to use
+> https://sonarcloud.io/login under its free plan for
+> open-source projects.
+
 ## License
 
 This project is licensed under the
