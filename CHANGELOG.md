@@ -28,6 +28,14 @@ the GitHub Release notes.
 
 ### Fixed
 
+## [0.0.26] - 2026-10-04
+
+### Added
+
+### Changed
+
+### Fixed
+
 - `README.md`: corrected the GitHub organization link text and the SonarQube
   Cloud link in "Open Source Project Information".
 
