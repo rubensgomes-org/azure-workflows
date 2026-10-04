@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.25] - 2026-10-04
+
+### Added
+
+### Changed
+
 - `README.md`: added an "Open Source Project Information" section.
 
 ### Fixed
