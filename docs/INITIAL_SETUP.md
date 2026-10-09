@@ -115,9 +115,9 @@ name: acr-build-push-java
 on:
   workflow_dispatch:
     inputs:
-      environment:
+      environment_name:
         description: >-
-          Image namespace, used as <environment>/<artifactId>:<tag>.
+          Image namespace, used as <environment_name>/<artifactId>:<tag>.
         required: false
         default: lab
         type: string
@@ -146,7 +146,7 @@ jobs:
   build:
     uses: rubensgomes-org/azure-workflows/.github/workflows/acr-build-push-java.yml@v0
     with:
-      environment: ${{ inputs.environment }}
+      environment_name: ${{ inputs.environment_name }}
       tag: ${{ inputs.tag }}
       registry-name: ${{ inputs.registry_name }}
       artifact-id: ${{ inputs.artifact_id }}
@@ -165,9 +165,9 @@ name: acr-build-push-python
 on:
   workflow_dispatch:
     inputs:
-      environment:
+      environment_name:
         description: >-
-          Image namespace, used as <environment>/<artifactId>:<tag>.
+          Image namespace, used as <environment_name>/<artifactId>:<tag>.
         required: false
         default: lab
         type: string
@@ -196,7 +196,7 @@ jobs:
   build:
     uses: rubensgomes-org/azure-workflows/.github/workflows/acr-build-push-python.yml@v0
     with:
-      environment: ${{ inputs.environment }}
+      environment_name: ${{ inputs.environment_name }}
       tag: ${{ inputs.tag }}
       registry-name: ${{ inputs.registry_name }}
       artifact-id: ${{ inputs.artifact_id }}
@@ -214,10 +214,10 @@ name: acr-repo-delete
 on:
   workflow_dispatch:
     inputs:
-      environment:
+      environment_name:
         description: >-
           Image namespace. With artifactId this forms the repository
-          <environment>/<artifactId>.
+          <environment_name>/<artifactId>.
         required: false
         default: lab
         type: string
@@ -237,7 +237,7 @@ jobs:
   delete:
     uses: rubensgomes-org/azure-workflows/.github/workflows/acr-repo-delete.yml@v0
     with:
-      environment: ${{ inputs.environment }}
+      environment_name: ${{ inputs.environment_name }}
       registry-name: ${{ inputs.registry_name }}
       azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
       azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}

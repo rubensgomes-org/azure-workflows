@@ -29,10 +29,10 @@ name: Delete ACR Repository (reusable)
 on:
   workflow_call:
     inputs:
-      environment:
+      environment_name:
         description: >-
           Image namespace. With artifactId this forms the repository
-          <environment>/<artifactId>.
+          <environment_name>/<artifactId>.
         required: true
         type: string
       registry-name:
@@ -43,8 +43,8 @@ on:
         type: string
       artifact-id:
         description: >-
-          Artifact ID. With environment this forms the repository
-          <environment>/<artifact-id>.
+          Artifact ID. With environment_name this forms the repository
+          <environment_name>/<artifact-id>.
         required: true
         type: string
       allowed-actor:
@@ -86,7 +86,7 @@ jobs:
 
     env:
       ACR_NAME: ${{ inputs.registry-name }}
-      ENVIRONMENT: ${{ inputs.environment }}
+      ENVIRONMENT: ${{ inputs.environment_name }}
       ALLOWED_ACTOR: ${{ inputs.allowed-actor }}
 
     steps:
@@ -101,7 +101,7 @@ jobs:
           echo "=============================================================="
           set -euo pipefail
           if [ -z "${ENVIRONMENT:-}" ]; then
-            echo "The environment input resolved to empty." >&2
+            echo "The environment_name input resolved to empty." >&2
             exit 1
           fi
           echo "repository=${ENVIRONMENT}/${ARTIFACT_ID}" >> "$GITHUB_OUTPUT"

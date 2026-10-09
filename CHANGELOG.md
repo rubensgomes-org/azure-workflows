@@ -26,6 +26,11 @@ the GitHub Release notes.
 
 ### Changed
 
+- **Breaking:** `acr-build-push.yml`, `acr-build-push-java.yml`,
+  `acr-build-push-python.yml`, and `acr-repo-delete.yml`: renamed the
+  `environment` input to `environment_name`.
+- `docs/INITIAL_SETUP.md`: caller examples use `environment_name`.
+
 ### Fixed
 
 ## [0.0.26] - 2026-10-04

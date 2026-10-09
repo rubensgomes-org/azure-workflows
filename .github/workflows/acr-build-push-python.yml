@@ -18,9 +18,9 @@ name: Poetry ACR Build and Push (reusable)
 on:
   workflow_call:
     inputs:
-      environment:
+      environment_name:
         description: >-
-          Image namespace, used as <environment>/<artifactId>:<tag>.
+          Image namespace, used as <environment_name>/<artifactId>:<tag>.
         required: true
         type: string
       tag:
@@ -125,6 +125,6 @@ jobs:
           azure-subscription-id: ${{ inputs.azure-subscription-id }}
           registry-name: ${{ inputs.registry-name }}
           artifact-id: ${{ inputs.artifact-id }}
-          environment: ${{ inputs.environment }}
+          environment: ${{ inputs.environment_name }}
           tag: ${{ inputs.tag }}
           app-version: ${{ steps.version.outputs.app_version }}
