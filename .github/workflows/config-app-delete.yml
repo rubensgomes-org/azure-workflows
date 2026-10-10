@@ -1,0 +1,115 @@
+# =============================================================================
+# config-app-delete
+#
+# Reusable workflow: DESTRUCTIVE. Deletes every key-value whose key starts
+# with the prefix input and whose label matches the label input from an
+# EXISTING Azure App Configuration store.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: Azure App Configuration Delete (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: 'Name of the EXISTING Azure App Configuration store.'
+        required: true
+        type: string
+      prefix:
+        description: 'Key prefix of the key-values to delete.'
+        required: true
+        type: string
+      label:
+        description: 'Label of the key-values to delete.'
+        required: true
+        type: string
+      timeout-minutes:
+        description: 'Job timeout in minutes.'
+        required: false
+        default: 15
+        type: number
+      azure-client-id:
+        description: 'Service principal application (client) ID.'
+        required: true
+        type: string
+      azure-tenant-id:
+        description: 'Entra ID tenant ID.'
+        required: true
+        type: string
+      azure-subscription-id:
+        description: 'Subscription holding the App Configuration store.'
+        required: true
+        type: string
+
+    secrets:
+      azure-client-secret:
+        description: 'Service principal client secret.'
+        required: true
+
+jobs:
+  delete:
+    name: delete
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+
+    env:
+      CONFIG_NAME: ${{ inputs.name }}
+      CONFIG_PREFIX: ${{ inputs.prefix }}
+      CONFIG_LABEL: ${{ inputs.label }}
+
+    steps:
+      # An empty prefix would match, and delete, every key under the label.
+      - name: Validate the inputs
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Validate the inputs"
+          echo "=============================================================="
+          set -euo pipefail
+          if [ -z "$CONFIG_PREFIX" ]; then
+            echo "The prefix input must not be empty." >&2
+            exit 1
+          fi
+          echo "Target: ${CONFIG_NAME}, prefix '${CONFIG_PREFIX}'," \
+               "label '${CONFIG_LABEL}'"
+
+      - name: Sign in to Azure
+        uses: rubensgomes-org/azure-workflows/.github/actions/azure-login@v0
+        with:
+          client-id: ${{ inputs.azure-client-id }}
+          client-secret: ${{ secrets.azure-client-secret }}
+          tenant-id: ${{ inputs.azure-tenant-id }}
+          subscription-id: ${{ inputs.azure-subscription-id }}
+
+      # "*" turns the key filter into a prefix match.
+      - name: Delete the matching key-values
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Delete the matching key-values"
+          echo " az appconfig kv delete --name ${CONFIG_NAME}" \
+               "--key '${CONFIG_PREFIX}*' --label '${CONFIG_LABEL}'"
+          echo "=============================================================="
+          set -euo pipefail
+          keys="$(az appconfig kv list \
+                    --name "$CONFIG_NAME" \
+                    --key "${CONFIG_PREFIX}*" \
+                    --label "$CONFIG_LABEL" \
+                    --all \
+                    --query "[].key" -o tsv)"
+          if [ -z "$keys" ]; then
+            echo "No matching key-values; nothing to delete."
+            exit 0
+          fi
+          echo "Deleting these keys:"
+          # shellcheck disable=SC2001
+          echo "$keys" | sed 's/^/  /'
+          az appconfig kv delete \
+            --name "$CONFIG_NAME" \
+            --key "${CONFIG_PREFIX}*" \
+            --label "$CONFIG_LABEL" \
+            --yes

@@ -13,7 +13,7 @@ declared `packages-token`.
 |-----------------------|-----------------------|--------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
 | `packages-token`      | `RUBENS_PAT_TOKEN`    | `gradle-build-verify`, `gradle-release`, `acr-build-push-java`                                 | classic PAT, `read:packages`. `gradle-release` also needs `repo` — it pushes |
 | `sonar-token`         | `SONAR_TOKEN`         | `gradle-build-verify`, `poetry-build-verify` (only when `run-sonar: true`)                       | must be able to **read quality gate status**, not just submit analyses       |
-| `azure-client-secret` | `AZURE_CLIENT_SECRET` | `acr-build-push-java`, `acr-build-push-python`, `acr-repo-delete`                            | service principal client secret                                              |
+| `azure-client-secret` | `AZURE_CLIENT_SECRET` | `acr-build-push-java`, `acr-build-push-python`, `acr-repo-delete`, `config-app-import`, `config-app-delete` | service principal client secret                                              |
 
 Every one of these is declared `required: true` except `sonar-token`, and an
 unset secret arrives as the **empty string** rather than as an error. That is
@@ -27,9 +27,9 @@ without a token.
 
 | Declared name           | Typically mapped from   | Required by                                                            | Notes                                                                          |
 |-------------------------|-------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------|
-| `azure-client-id`       | `AZURE_CLIENT_ID`       | `acr-build-push-java`, `acr-build-push-python`, `acr-repo-delete` | service principal application (client) ID                                      |
-| `azure-tenant-id`       | `AZURE_TENANT_ID`       | `acr-build-push-java`, `acr-build-push-python`, `acr-repo-delete` | Entra ID tenant the principal belongs to                                       |
-| `azure-subscription-id` | `AZURE_SUBSCRIPTION_ID` | `acr-build-push-java`, `acr-build-push-python`, `acr-repo-delete` | subscription holding the registry — four separate values, not one `creds` JSON |
+| `azure-client-id`       | `AZURE_CLIENT_ID`       | `acr-build-push-java`, `acr-build-push-python`, `acr-repo-delete`, `config-app-import`, `config-app-delete` | service principal application (client) ID                                      |
+| `azure-tenant-id`       | `AZURE_TENANT_ID`       | `acr-build-push-java`, `acr-build-push-python`, `acr-repo-delete`, `config-app-import`, `config-app-delete` | Entra ID tenant the principal belongs to                                       |
+| `azure-subscription-id` | `AZURE_SUBSCRIPTION_ID` | `acr-build-push-java`, `acr-build-push-python`, `acr-repo-delete`, `config-app-import`, `config-app-delete` | subscription holding the registry — four separate values, not one `creds` JSON |
 
 Callers pass these under `with:`, not `secrets:`. They identify the principal
 but grant nothing without `azure-client-secret`, so keeping them variables

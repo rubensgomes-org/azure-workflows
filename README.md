@@ -55,6 +55,8 @@ Follow the steps in [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 | `acr-build-push-python.yml` | build a Python/Poetry app, publish its image to an existing ACR, verify, smoke-test, purge       |
 | `acr-build-push.yml`        | language-agnostic — publish a prebuilt app's image to an existing ACR, verify, smoke-test, purge |
 | `acr-repo-delete.yml`       | **destructive** — delete a repository and all its tags from an ACR                               |
+| `config-app-import.yml`     | import a JSON or YAML file into an existing Azure App Configuration store                        |
+| `config-app-delete.yml`     | **destructive** — delete key-values by prefix and label from an App Configuration store          |
 
 | Composite action      | Purpose                                                       |
 |-----------------------|---------------------------------------------------------------|

@@ -1,0 +1,126 @@
+# =============================================================================
+# config-app-import
+#
+# Reusable workflow: import key-values from a file in the CALLING repository
+# into an EXISTING Azure App Configuration store.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: Azure App Configuration Import (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: 'Name of the EXISTING Azure App Configuration store.'
+        required: true
+        type: string
+      path:
+        description: 'Path to the configuration file in the checkout.'
+        required: true
+        type: string
+      format:
+        description: "Configuration file format: 'json' or 'yaml'."
+        required: true
+        type: string
+      label:
+        description: 'Label applied to every imported key-value.'
+        required: true
+        type: string
+      prefix:
+        description: 'Prefix prepended to every imported key.'
+        required: true
+        type: string
+      timeout-minutes:
+        description: 'Job timeout in minutes.'
+        required: false
+        default: 15
+        type: number
+      azure-client-id:
+        description: 'Service principal application (client) ID.'
+        required: true
+        type: string
+      azure-tenant-id:
+        description: 'Entra ID tenant ID.'
+        required: true
+        type: string
+      azure-subscription-id:
+        description: 'Subscription holding the App Configuration store.'
+        required: true
+        type: string
+
+    secrets:
+      azure-client-secret:
+        description: 'Service principal client secret.'
+        required: true
+
+jobs:
+  import:
+    name: import
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+
+    env:
+      CONFIG_NAME: ${{ inputs.name }}
+      CONFIG_PATH: ${{ inputs.path }}
+      CONFIG_FORMAT: ${{ inputs.format }}
+      CONFIG_LABEL: ${{ inputs.label }}
+      CONFIG_PREFIX: ${{ inputs.prefix }}
+
+    steps:
+      # Checks out the CALLING repository, not azure-workflows.
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      # workflow_call has no "choice" type, so the format is checked here.
+      - name: Validate the inputs
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Validate the inputs"
+          echo "=============================================================="
+          set -euo pipefail
+          case "$CONFIG_FORMAT" in
+            json|yaml) ;;
+            *)
+              echo "Unsupported format '${CONFIG_FORMAT}'." >&2
+              echo "Expected 'json' or 'yaml'." >&2
+              exit 1
+              ;;
+          esac
+          if [ ! -f "$CONFIG_PATH" ]; then
+            echo "Configuration file '${CONFIG_PATH}' not found." >&2
+            exit 1
+          fi
+          echo "Importing ${CONFIG_PATH} (${CONFIG_FORMAT}) into ${CONFIG_NAME}"
+
+      - name: Sign in to Azure
+        uses: rubensgomes-org/azure-workflows/.github/actions/azure-login@v0
+        with:
+          client-id: ${{ inputs.azure-client-id }}
+          client-secret: ${{ secrets.azure-client-secret }}
+          tenant-id: ${{ inputs.azure-tenant-id }}
+          subscription-id: ${{ inputs.azure-subscription-id }}
+
+      # --yes: without it the command waits for a confirmation prompt.
+      - name: Import the configuration
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Import the configuration"
+          echo " az appconfig kv import --name ${CONFIG_NAME}" \
+               "--path ${CONFIG_PATH}"
+          echo "=============================================================="
+          set -euo pipefail
+          az appconfig kv import \
+            --source file \
+            --name "$CONFIG_NAME" \
+            --path "$CONFIG_PATH" \
+            --format "$CONFIG_FORMAT" \
+            --separator "/" \
+            --prefix "$CONFIG_PREFIX" \
+            --label "$CONFIG_LABEL" \
+            --yes
