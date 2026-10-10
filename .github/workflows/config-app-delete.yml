@@ -86,6 +86,7 @@ jobs:
           subscription-id: ${{ inputs.azure-subscription-id }}
 
       # "*" turns the key filter into a prefix match.
+      # --auth-mode login: use Entra ID RBAC; access keys may be disabled.
       - name: Delete the matching key-values
         shell: bash
         run: |
@@ -97,6 +98,7 @@ jobs:
           set -euo pipefail
           keys="$(az appconfig kv list \
                     --name "$CONFIG_NAME" \
+                    --auth-mode login \
                     --key "${CONFIG_PREFIX}*" \
                     --label "$CONFIG_LABEL" \
                     --all \
@@ -110,6 +112,7 @@ jobs:
           echo "$keys" | sed 's/^/  /'
           az appconfig kv delete \
             --name "$CONFIG_NAME" \
+            --auth-mode login \
             --key "${CONFIG_PREFIX}*" \
             --label "$CONFIG_LABEL" \
             --yes

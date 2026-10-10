@@ -28,6 +28,9 @@ the GitHub Release notes.
 
 ### Fixed
 
+- `config-app-import` and `config-app-delete` authenticate with
+  `--auth-mode login`, so stores with access keys disabled work.
+
 ## [0.0.28] - 2026-10-10
 
 ### Added

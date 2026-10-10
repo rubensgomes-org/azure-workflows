@@ -106,6 +106,7 @@ jobs:
           subscription-id: ${{ inputs.azure-subscription-id }}
 
       # --yes: without it the command waits for a confirmation prompt.
+      # --auth-mode login: use Entra ID RBAC; access keys may be disabled.
       - name: Import the configuration
         shell: bash
         run: |
@@ -118,6 +119,7 @@ jobs:
           az appconfig kv import \
             --source file \
             --name "$CONFIG_NAME" \
+            --auth-mode login \
             --path "$CONFIG_PATH" \
             --format "$CONFIG_FORMAT" \
             --separator "/" \
