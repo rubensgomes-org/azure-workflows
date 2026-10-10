@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.30] - 2026-10-10
+
+### Added
+
+### Changed
+
 - `config-app-import` prints the imported key-values after the import.
 
 ### Fixed
