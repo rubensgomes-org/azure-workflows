@@ -126,3 +126,21 @@ jobs:
             --prefix "$CONFIG_PREFIX" \
             --label "$CONFIG_LABEL" \
             --yes
+
+      - name: Verify the imported configuration
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Verify the imported configuration"
+          echo " az appconfig kv list --name ${CONFIG_NAME}" \
+               "--key ${CONFIG_PREFIX}* --label ${CONFIG_LABEL}"
+          echo "=============================================================="
+          set -euo pipefail
+          az appconfig kv list \
+            --name "$CONFIG_NAME" \
+            --auth-mode login \
+            --key "${CONFIG_PREFIX}*" \
+            --label "$CONFIG_LABEL" \
+            --all \
+            --query "[].{key:key, value:value}" \
+            --output table
