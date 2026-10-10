@@ -24,6 +24,14 @@ the GitHub Release notes.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.0.28] - 2026-10-10
+
+### Added
+
 - `config-app-import.yml`: import a JSON or YAML file into an existing
   Azure App Configuration store.
 - `config-app-delete.yml`: delete key-values matching a key prefix and label
