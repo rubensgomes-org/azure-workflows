@@ -24,6 +24,14 @@ the GitHub Release notes.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.0.31] - 2026-10-11
+
+### Added
+
 - `key-vault-import.yml`: set secrets from a JSON object of names to values
   in an existing Azure Key Vault.
 - `key-vault-delete.yml`: delete, and optionally purge, named secrets from an
