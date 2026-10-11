@@ -10,7 +10,7 @@
 # refer to the `AI_DISCLAIMER.md` document located in the project's root
 # directory.
 # =============================================================================
-name: Azure Key Vault Delete (reusable)
+name: Key Vault Delete (reusable)
 
 on:
   workflow_call:

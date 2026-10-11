@@ -13,7 +13,7 @@
 # refer to the `AI_DISCLAIMER.md` document located in the project's root
 # directory.
 # =============================================================================
-name: Poetry ACR Build and Push (reusable)
+name: ACR Poetry Build and Push (reusable)
 
 on:
   workflow_call:

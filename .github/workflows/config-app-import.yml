@@ -9,7 +9,7 @@
 # refer to the `AI_DISCLAIMER.md` document located in the project's root
 # directory.
 # =============================================================================
-name: Azure App Configuration Import (reusable)
+name: App Configuration Import (reusable)
 
 on:
   workflow_call:
