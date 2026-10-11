@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.34] - 2026-10-11
+
+### Added
+
+### Changed
+
 - **BREAKING** `key-vault-import.yml` and `key-vault-delete.yml`: names are no
   longer converted from `_` to `-`; each secret is named `<prefix>--<name>`,
   and an invalid name fails validation.
