@@ -57,8 +57,8 @@ Follow the steps in [INITIAL_SETUP](./docs/INITIAL_SETUP.md).
 | `acr-repo-delete.yml`       | **destructive** — delete a repository and all its tags from an ACR                               |
 | `config-app-import.yml`     | import a JSON or YAML file into an existing Azure App Configuration store                        |
 | `config-app-delete.yml`     | **destructive** — delete key-values by prefix and label from an App Configuration store          |
-| `key-vault-import.yml`      | set secrets from a JSON object of names to values in an existing Azure Key Vault                 |
-| `key-vault-delete.yml`      | **destructive** — delete, and optionally purge, named secrets from a Key Vault                   |
+| `key-vault-import.yml`      | set secrets from a YAML file of names to secret placeholders in an existing Azure Key Vault      |
+| `key-vault-delete.yml`      | **destructive** — delete, and optionally purge, secrets listed in a YAML file from a Key Vault   |
 
 | Composite action      | Purpose                                                       |
 |-----------------------|---------------------------------------------------------------|

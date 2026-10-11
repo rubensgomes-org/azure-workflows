@@ -26,6 +26,13 @@ the GitHub Release notes.
 
 ### Changed
 
+- **BREAKING** `key-vault-import.yml` and `key-vault-delete.yml`: read a YAML
+  file from the calling repository (`path`) and require a `prefix`; each name
+  maps to `<prefix>--<name>` with `_` replaced by `-`. Import replaces the
+  `secrets-json` secret with `caller-secrets` (`toJSON(secrets)`), which
+  resolves the file's `secrets.NAME` placeholders. Delete replaces the
+  `secret-names` input.
+
 ### Fixed
 
 ## [0.0.32] - 2026-10-11

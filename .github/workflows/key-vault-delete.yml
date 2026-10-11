@@ -1,9 +1,10 @@
 # =============================================================================
 # key-vault-delete
 #
-# Reusable workflow: DESTRUCTIVE. Deletes the named secrets from an EXISTING
-# Azure Key Vault and, when purge is true, purges them so they cannot be
-# recovered.
+# Reusable workflow: DESTRUCTIVE. Deletes the secrets named in a YAML list
+# file in the CALLING repository from an EXISTING Azure Key Vault and, when
+# purge is true, purges them so they cannot be recovered. Each name maps to
+# "<prefix>--<name>" with "_" replaced by "-".
 #
 # This project's source code and documentation were generated with the
 # assistance of Artificial Intelligence (AI). For more information, please
@@ -19,8 +20,12 @@ on:
         description: 'Name of the EXISTING Azure Key Vault.'
         required: true
         type: string
-      secret-names:
-        description: 'JSON array of the secret names to delete.'
+      path:
+        description: 'Path to the YAML list of secret names in the checkout.'
+        required: true
+        type: string
+      prefix:
+        description: 'Prefix prepended to each secret name with "--".'
         required: true
         type: string
       purge:
@@ -59,10 +64,16 @@ jobs:
 
     env:
       VAULT_NAME: ${{ inputs.vault-name }}
-      SECRET_NAMES: ${{ inputs.secret-names }}
+      SECRET_NAMES_PATH: ${{ inputs.path }}
       PURGE: ${{ inputs.purge }}
+      SECRET_PREFIX: ${{ inputs.prefix }}
+      KEY_VAULT_NAMES_FILTER: '.[] | "\($prefix)--\(gsub("_"; "-"))"'
 
     steps:
+      # Checks out the CALLING repository, not azure-workflows.
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
       # Key Vault secret names allow only alphanumerics and dashes.
       - name: Validate the inputs
         shell: bash
@@ -71,15 +82,21 @@ jobs:
           echo " STEP: Validate the inputs"
           echo "=============================================================="
           set -euo pipefail
-          if ! jq -e 'type == "array" and length > 0
-                      and all(.[]; type == "string")' \
-                 <<< "$SECRET_NAMES" > /dev/null 2>&1; then
-            echo "secret-names must be a non-empty JSON array of strings." >&2
+          if ! grep -Eqx '[0-9a-zA-Z-]+' <<< "$SECRET_PREFIX"; then
+            echo "Invalid prefix '${SECRET_PREFIX}'." >&2
             exit 1
           fi
-          invalid="$(jq -r '.[]
-                            | select(test("^[0-9a-zA-Z-]{1,127}$") | not)' \
-                       <<< "$SECRET_NAMES")"
+          if ! yq -o=json "$SECRET_NAMES_PATH" \
+               | jq -e 'type == "array" and length > 0
+                        and all(.[]; type == "string")' > /dev/null; then
+            echo "'${SECRET_NAMES_PATH}' must be a non-empty YAML list" \
+                 "of strings." >&2
+            exit 1
+          fi
+          invalid="$(yq -o=json "$SECRET_NAMES_PATH" \
+                       | jq -r --arg prefix "$SECRET_PREFIX" \
+                           "$KEY_VAULT_NAMES_FILTER" \
+                       | grep -Evx '[0-9a-zA-Z-]{1,127}' || true)"
           if [ -n "$invalid" ]; then
             echo "Invalid Key Vault secret names:" >&2
             # shellcheck disable=SC2001
@@ -146,4 +163,6 @@ jobs:
                 --vault-name "$VAULT_NAME" \
                 --name "$secret_name"
             fi
-          done < <(jq -r '.[]' <<< "$SECRET_NAMES")
+          done < <(yq -o=json "$SECRET_NAMES_PATH" \
+                     | jq -r --arg prefix "$SECRET_PREFIX" \
+                         "$KEY_VAULT_NAMES_FILTER")

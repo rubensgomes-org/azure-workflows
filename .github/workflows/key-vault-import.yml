@@ -1,9 +1,11 @@
 # =============================================================================
 # key-vault-import
 #
-# Reusable workflow: set every secret in the secrets-json secret, a JSON
-# object of secret names to values, in an EXISTING Azure Key Vault. Values
-# are never printed.
+# Reusable workflow: set every secret in a YAML file in the CALLING
+# repository in an EXISTING Azure Key Vault. The file maps secret names to
+# "secrets.NAME" expression placeholders, which are resolved from the
+# caller-secrets secret (the caller's toJSON(secrets)). Each name maps to
+# "<prefix>--<name>" with "_" replaced by "-". Values are never printed.
 #
 # This project's source code and documentation were generated with the
 # assistance of Artificial Intelligence (AI). For more information, please
@@ -17,6 +19,14 @@ on:
     inputs:
       vault-name:
         description: 'Name of the EXISTING Azure Key Vault.'
+        required: true
+        type: string
+      path:
+        description: 'Path to the YAML map of secret names in the checkout.'
+        required: true
+        type: string
+      prefix:
+        description: 'Prefix prepended to each secret name with "--".'
         required: true
         type: string
       timeout-minutes:
@@ -38,8 +48,8 @@ on:
         type: string
 
     secrets:
-      secrets-json:
-        description: 'JSON object mapping secret names to string values.'
+      caller-secrets:
+        description: "The caller's secrets as JSON: toJSON(secrets)."
         required: true
       azure-client-secret:
         description: 'Service principal client secret.'
@@ -53,36 +63,67 @@ jobs:
 
     env:
       VAULT_NAME: ${{ inputs.vault-name }}
+      SECRETS_PATH: ${{ inputs.path }}
+      SECRET_PREFIX: ${{ inputs.prefix }}
+      # Matches a whole "secrets.NAME" expression and captures NAME.
+      PLACEHOLDER_PATTERN: '^\$\{\{ *secrets\.(?<name>[A-Za-z0-9_]+) *\}\}$'
+      # Emits "<Key Vault name><TAB><caller secret name>" per entry.
+      ENTRIES_FILTER: >-
+        to_entries[]
+        | "\($prefix)--\(.key | gsub("_"; "-"))\t\(.value
+          | capture($pattern).name | ascii_upcase)"
 
     steps:
+      # Checks out the CALLING repository, not azure-workflows.
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
       # Key Vault secret names allow only alphanumerics and dashes.
+      # Secret names are case-insensitive, so lookups use upper case.
       - name: Validate the inputs
         shell: bash
         env:
-          SECRETS_JSON: ${{ secrets.secrets-json }}
+          CALLER_SECRETS: ${{ secrets.caller-secrets }}
         run: |
           echo "=============================================================="
           echo " STEP: Validate the inputs"
           echo "=============================================================="
           set -euo pipefail
-          if ! jq -e 'type == "object" and length > 0
-                      and all(.[]; type == "string")' \
-                 <<< "$SECRETS_JSON" > /dev/null 2>&1; then
-            echo "secrets-json must be a non-empty JSON object whose" \
-                 "values are strings." >&2
+          if ! grep -Eqx '[0-9a-zA-Z-]+' <<< "$SECRET_PREFIX"; then
+            echo "Invalid prefix '${SECRET_PREFIX}'." >&2
             exit 1
           fi
-          invalid="$(jq -r 'keys[]
-                            | select(test("^[0-9a-zA-Z-]{1,127}$") | not)' \
-                       <<< "$SECRETS_JSON")"
+          if ! yq -o=json "$SECRETS_PATH" \
+               | jq -e --arg pattern "$PLACEHOLDER_PATTERN" \
+                   'type == "object" and length > 0
+                    and all(.[]; type == "string" and test($pattern))' \
+                   > /dev/null; then
+            echo "'${SECRETS_PATH}' must be a non-empty YAML map whose" \
+                 "values are secrets.NAME expression placeholders." >&2
+            exit 1
+          fi
+          entries="$(yq -o=json "$SECRETS_PATH" \
+                       | jq -r --arg prefix "$SECRET_PREFIX" \
+                           --arg pattern "$PLACEHOLDER_PATTERN" \
+                           "$ENTRIES_FILTER")"
+          invalid="$(cut -f1 <<< "$entries" \
+                       | grep -Evx '[0-9a-zA-Z-]{1,127}' || true)"
           if [ -n "$invalid" ]; then
             echo "Invalid Key Vault secret names:" >&2
             # shellcheck disable=SC2001
             echo "$invalid" | sed 's/^/  /' >&2
             exit 1
           fi
-          echo "Importing $(jq length <<< "$SECRETS_JSON") secrets" \
-               "into ${VAULT_NAME}"
+          available="$(jq -r 'keys[] | ascii_upcase' <<< "$CALLER_SECRETS")"
+          missing="$(cut -f2 <<< "$entries" \
+                       | grep -Fvxf <(echo "$available") || true)"
+          if [ -n "$missing" ]; then
+            echo "Secrets not passed by the caller:" >&2
+            # shellcheck disable=SC2001
+            echo "$missing" | sed 's/^/  /' >&2
+            exit 1
+          fi
+          echo "Importing $(wc -l <<< "$entries") secrets into ${VAULT_NAME}"
 
       - name: Sign in to Azure
         uses: rubensgomes-org/azure-workflows/.github/actions/azure-login@v0
@@ -94,11 +135,12 @@ jobs:
 
       # Each value goes through a 0600 temp file rather than --value, so it
       # never appears in a process argument list and keeps any trailing
-      # newline.
+      # newline. Each value line is masked, since only the whole
+      # caller-secrets JSON is masked by default.
       - name: Import the secrets
         shell: bash
         env:
-          SECRETS_JSON: ${{ secrets.secrets-json }}
+          CALLER_SECRETS: ${{ secrets.caller-secrets }}
         run: |
           echo "=============================================================="
           echo " STEP: Import the secrets"
@@ -107,33 +149,43 @@ jobs:
           set -euo pipefail
           value_file="$(mktemp "${RUNNER_TEMP}/kv-secret.XXXXXX")"
           trap 'rm -f "$value_file"' EXIT
-          while IFS= read -r secret_name; do
-            echo "Setting secret: ${secret_name}"
-            jq -j --arg name "$secret_name" '.[$name]' \
-              <<< "$SECRETS_JSON" > "$value_file"
+          while IFS=$'\t' read -r key_vault_name caller_name; do
+            jq -j --arg name "$caller_name" \
+              'with_entries(.key |= ascii_upcase) | .[$name]' \
+              <<< "$CALLER_SECRETS" > "$value_file"
+            while IFS= read -r line || [ -n "$line" ]; do
+              if [ -n "$line" ]; then
+                echo "::add-mask::${line}"
+              fi
+            done < "$value_file"
+            echo "Setting secret: ${key_vault_name}"
             az keyvault secret set \
               --vault-name "$VAULT_NAME" \
-              --name "$secret_name" \
+              --name "$key_vault_name" \
               --file "$value_file" \
               --encoding utf-8 \
               --output none
-          done < <(jq -r 'keys[]' <<< "$SECRETS_JSON")
+          done < <(yq -o=json "$SECRETS_PATH" \
+                     | jq -r --arg prefix "$SECRET_PREFIX" \
+                         --arg pattern "$PLACEHOLDER_PATTERN" \
+                         "$ENTRIES_FILTER")
 
       - name: Verify the imported secrets
         shell: bash
-        env:
-          SECRETS_JSON: ${{ secrets.secrets-json }}
         run: |
           echo "=============================================================="
           echo " STEP: Verify the imported secrets"
           echo " az keyvault secret show --vault-name ${VAULT_NAME}"
           echo "=============================================================="
           set -euo pipefail
-          while IFS= read -r secret_name; do
+          while IFS=$'\t' read -r key_vault_name _; do
             updated="$(az keyvault secret show \
                          --vault-name "$VAULT_NAME" \
-                         --name "$secret_name" \
+                         --name "$key_vault_name" \
                          --query attributes.updated \
                          --output tsv)"
-            echo "  ${secret_name}  updated ${updated}"
-          done < <(jq -r 'keys[]' <<< "$SECRETS_JSON")
+            echo "  ${key_vault_name}  updated ${updated}"
+          done < <(yq -o=json "$SECRETS_PATH" \
+                     | jq -r --arg prefix "$SECRET_PREFIX" \
+                         --arg pattern "$PLACEHOLDER_PATTERN" \
+                         "$ENTRIES_FILTER")
