@@ -1,0 +1,149 @@
+# =============================================================================
+# key-vault-delete
+#
+# Reusable workflow: DESTRUCTIVE. Deletes the named secrets from an EXISTING
+# Azure Key Vault and, when purge is true, purges them so they cannot be
+# recovered.
+#
+# This project's source code and documentation were generated with the
+# assistance of Artificial Intelligence (AI). For more information, please
+# refer to the `AI_DISCLAIMER.md` document located in the project's root
+# directory.
+# =============================================================================
+name: Azure Key Vault Delete (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      vault-name:
+        description: 'Name of the EXISTING Azure Key Vault.'
+        required: true
+        type: string
+      secret-names:
+        description: 'JSON array of the secret names to delete.'
+        required: true
+        type: string
+      purge:
+        description: 'Permanently purge the secrets after deleting them.'
+        required: false
+        default: false
+        type: boolean
+      timeout-minutes:
+        description: 'Job timeout in minutes.'
+        required: false
+        default: 15
+        type: number
+      azure-client-id:
+        description: 'Service principal application (client) ID.'
+        required: true
+        type: string
+      azure-tenant-id:
+        description: 'Entra ID tenant ID.'
+        required: true
+        type: string
+      azure-subscription-id:
+        description: 'Subscription holding the Key Vault.'
+        required: true
+        type: string
+
+    secrets:
+      azure-client-secret:
+        description: 'Service principal client secret.'
+        required: true
+
+jobs:
+  delete:
+    name: delete
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+
+    env:
+      VAULT_NAME: ${{ inputs.vault-name }}
+      SECRET_NAMES: ${{ inputs.secret-names }}
+      PURGE: ${{ inputs.purge }}
+
+    steps:
+      # Key Vault secret names allow only alphanumerics and dashes.
+      - name: Validate the inputs
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Validate the inputs"
+          echo "=============================================================="
+          set -euo pipefail
+          if ! jq -e 'type == "array" and length > 0
+                      and all(.[]; type == "string")' \
+                 <<< "$SECRET_NAMES" > /dev/null 2>&1; then
+            echo "secret-names must be a non-empty JSON array of strings." >&2
+            exit 1
+          fi
+          invalid="$(jq -r '.[]
+                            | select(test("^[0-9a-zA-Z-]{1,127}$") | not)' \
+                       <<< "$SECRET_NAMES")"
+          if [ -n "$invalid" ]; then
+            echo "Invalid Key Vault secret names:" >&2
+            # shellcheck disable=SC2001
+            echo "$invalid" | sed 's/^/  /' >&2
+            exit 1
+          fi
+          echo "Target: ${VAULT_NAME}, purge: ${PURGE}"
+
+      - name: Sign in to Azure
+        uses: rubensgomes-org/azure-workflows/.github/actions/azure-login@v0
+        with:
+          client-id: ${{ inputs.azure-client-id }}
+          client-secret: ${{ secrets.azure-client-secret }}
+          tenant-id: ${{ inputs.azure-tenant-id }}
+          subscription-id: ${{ inputs.azure-subscription-id }}
+
+      # A purge fails until the soft-delete completes, so it polls first.
+      - name: Delete the secrets
+        shell: bash
+        run: |
+          echo "=============================================================="
+          echo " STEP: Delete the secrets"
+          echo " az keyvault secret delete --vault-name ${VAULT_NAME}"
+          echo "=============================================================="
+          set -euo pipefail
+          readonly POLL_ATTEMPTS=30
+          readonly POLL_INTERVAL_SECONDS=2
+
+          wait_for_soft_delete() {
+            local secret_name="$1"
+            local attempt
+            for ((attempt = 1; attempt <= POLL_ATTEMPTS; attempt++)); do
+              if az keyvault secret show-deleted \
+                   --vault-name "$VAULT_NAME" \
+                   --name "$secret_name" \
+                   --output none 2> /dev/null; then
+                return 0
+              fi
+              sleep "$POLL_INTERVAL_SECONDS"
+            done
+            echo "Secret '${secret_name}' was not soft-deleted after" \
+                 "$((POLL_ATTEMPTS * POLL_INTERVAL_SECONDS))s." >&2
+            return 1
+          }
+
+          existing="$(az keyvault secret list \
+                        --vault-name "$VAULT_NAME" \
+                        --query "[].name" \
+                        --output tsv)"
+          while IFS= read -r secret_name; do
+            if ! grep -Fxq "$secret_name" <<< "$existing"; then
+              echo "Secret '${secret_name}' not found; skipping."
+              continue
+            fi
+            echo "Deleting secret: ${secret_name}"
+            az keyvault secret delete \
+              --vault-name "$VAULT_NAME" \
+              --name "$secret_name" \
+              --output none
+            if [ "$PURGE" = "true" ]; then
+              wait_for_soft_delete "$secret_name"
+              echo "Purging secret: ${secret_name}"
+              az keyvault secret purge \
+                --vault-name "$VAULT_NAME" \
+                --name "$secret_name"
+            fi
+          done < <(jq -r '.[]' <<< "$SECRET_NAMES")
