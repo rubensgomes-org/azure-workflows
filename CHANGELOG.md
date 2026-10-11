@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.32] - 2026-10-11
+
+### Added
+
+### Changed
+
 - Renamed workflow display names so the resource prefix comes first, such as
   `ACR Gradle Build and Push` and `Key Vault Import`. `lint` and `release`
   are now `Lint (self-CI)` and `Release (self-CI)`.
