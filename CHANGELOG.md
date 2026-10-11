@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.33] - 2026-10-11
+
+### Added
+
+### Changed
+
 - **BREAKING** `key-vault-import.yml` and `key-vault-delete.yml`: read a YAML
   file from the calling repository (`path`) and require a `prefix`; each name
   maps to `<prefix>--<name>` with `_` replaced by `-`. Import replaces the
