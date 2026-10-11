@@ -4,8 +4,8 @@
 # Reusable workflow: set every secret in a YAML file in the CALLING
 # repository in an EXISTING Azure Key Vault. The file maps secret names to
 # "secrets.NAME" expression placeholders, which are resolved from the
-# caller-secrets secret (the caller's toJSON(secrets)). Each name maps to
-# "<prefix>--<name>" with "_" replaced by "-". Values are never printed.
+# caller-secrets secret (the caller's toJSON(secrets)). Each secret is named
+# "<prefix>--<name>". Values are never printed.
 #
 # This project's source code and documentation were generated with the
 # assistance of Artificial Intelligence (AI). For more information, please
@@ -70,7 +70,7 @@ jobs:
       # Emits "<Key Vault name><TAB><caller secret name>" per entry.
       ENTRIES_FILTER: >-
         to_entries[]
-        | "\($prefix)--\(.key | gsub("_"; "-"))\t\(.value
+        | "\($prefix)--\(.key)\t\(.value
           | capture($pattern).name | ascii_upcase)"
 
     steps:

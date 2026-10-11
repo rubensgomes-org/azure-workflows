@@ -3,8 +3,8 @@
 #
 # Reusable workflow: DESTRUCTIVE. Deletes the secrets named in a YAML list
 # file in the CALLING repository from an EXISTING Azure Key Vault and, when
-# purge is true, purges them so they cannot be recovered. Each name maps to
-# "<prefix>--<name>" with "_" replaced by "-".
+# purge is true, purges them so they cannot be recovered. Each secret is
+# named "<prefix>--<name>".
 #
 # This project's source code and documentation were generated with the
 # assistance of Artificial Intelligence (AI). For more information, please
@@ -67,7 +67,7 @@ jobs:
       SECRET_NAMES_PATH: ${{ inputs.path }}
       PURGE: ${{ inputs.purge }}
       SECRET_PREFIX: ${{ inputs.prefix }}
-      KEY_VAULT_NAMES_FILTER: '.[] | "\($prefix)--\(gsub("_"; "-"))"'
+      KEY_VAULT_NAMES_FILTER: '.[] | "\($prefix)--\(.)"'
 
     steps:
       # Checks out the CALLING repository, not azure-workflows.
