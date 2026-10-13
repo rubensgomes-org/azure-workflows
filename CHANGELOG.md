@@ -26,6 +26,9 @@ the GitHub Release notes.
 
 ### Changed
 
+- `README.md`: restyled the SonarQube Cloud eligibility note as a GitHub
+  `[!IMPORTANT]` alert.
+
 ### Fixed
 
 ## [0.0.34] - 2026-10-11
