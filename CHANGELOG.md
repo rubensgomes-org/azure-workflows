@@ -26,6 +26,14 @@ the GitHub Release notes.
 
 ### Changed
 
+### Fixed
+
+## [0.0.36] - 2026-10-12
+
+### Added
+
+### Changed
+
 - `README.md`: retitled to "Reusable GitHub Actions Workflows".
 
 ### Fixed
