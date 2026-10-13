@@ -1,4 +1,4 @@
-# Reusable GitHub Workflows
+# Reusable GitHub Actions Workflows
 
 [![GitHub](https://img.shields.io/badge/GitHub-Actions-0969da?logo=github+actions)](https://github.com/features/actions)
 [![Microsoft](https://img.shields.io/badge/Microsoft-Azure-0969da)](https://azure.microsoft.com/en-us)
